@@ -31,14 +31,13 @@
     <div id="root"></div>
 
     <script type="module">
-        // Импортируем Firebase SDK через CDN (для работы в браузере без сборщика)
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
         import { 
             getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion 
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // --- ТВОЯ КОНФИГУРАЦИЯ ---
+        // ТВОЯ КОНФИГУРАЦИЯ
         const firebaseConfig = {
             apiKey: "AIzaSyCbzbhEn__nA9TXawnqRVU2DbZFyeJa_2U",
             authDomain: "aigenerator75-3fb8e.firebaseapp.com",
@@ -49,18 +48,12 @@
             measurementId: "G-W8TPE5PLEF"
         };
 
-        // Инициализация
         const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app); // Подключили аналитику
-        const db = getFirestore(app);      // Подключили базу данных
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
 
-        // Делаем функции доступными глобально для React
         window.db = db;
         window.fs = { doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion };
-        
-        console.log("Firebase initialized for project: " + firebaseConfig.projectId);
-
-        // Сигнал, что Firebase готов
         window.firebaseReady = true;
         document.dispatchEvent(new Event('firebase-ready'));
     </script>
@@ -68,13 +61,12 @@
     <script type="text/babel">
         const { useState, useEffect, useRef } = React;
         
-        // !ВАЖНО: Замени это число на свой Telegram ID (узнай в боте @userinfobot), 
-        // иначе ты не увидишь кнопку "Панель Админа" в профиле.
+        // ! ВАЖНО: Замени на свой Telegram ID для доступа к Админке
         const ADMIN_ID = 12345678; 
 
         const App = () => {
             const [activeTab, setActiveTab] = useState('generate');
-            const [user, setUser] = useState(null); // Данные TG юзера
+            const [user, setUser] = useState(null);
             const [isLoading, setIsLoading] = useState(true);
             
             // Данные из БД
@@ -96,12 +88,10 @@
                     tg.expand();
 
                     let telegramUser = tg.initDataUnsafe?.user;
-                    // Mock для браузера (если открыто не в телеграме)
                     if (!telegramUser) telegramUser = { id: ADMIN_ID, first_name: 'BrowserUser', username: 'tester' };
                     
                     setUser(telegramUser);
                     
-                    // Ждем загрузки Firebase скрипта
                     if (!window.firebaseReady) {
                         await new Promise(resolve => document.addEventListener('firebase-ready', resolve));
                     }
@@ -109,47 +99,43 @@
                     const { doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion } = window.fs;
                     const db = window.db;
 
-                    // 1. ПОДПИСКА НА КОНФИГ (Глобальные настройки)
+                    // Загрузка глобальных настроек
                     const configRef = doc(db, "settings", "global");
                     onSnapshot(configRef, (snap) => {
-                        if (snap.exists()) {
-                            setConfig(snap.data());
-                        } else {
-                            // Первичная настройка базы, если пустая
-                            setDoc(configRef, config);
-                        }
+                        if (snap.exists()) setConfig(snap.data());
+                        else setDoc(configRef, config);
                     });
 
-                    // 2. РАБОТА С ЮЗЕРОМ
+                    // Загрузка юзера
                     const userRef = doc(db, "users", telegramUser.id.toString());
                     const userSnap = await getDoc(userRef);
 
                     if (!userSnap.exists()) {
-                        // Новый пользователь
-                        const startParam = tg.initDataUnsafe?.start_param; // Реферальный код
+                        // Поиск реферального параметра
+                        // Поддерживаем и tgWebAppStartParam (прямая ссылка) и start_param (бот)
+                        const urlParams = new URLSearchParams(window.location.search);
+                        const startParam = tg.initDataUnsafe?.start_param || urlParams.get('start'); 
                         
                         await setDoc(userRef, {
                             username: telegramUser.username || '',
                             firstName: telegramUser.first_name || '',
-                            balance: 100, // Стартовый баланс (можно брать из config позже)
+                            balance: 100, 
                             referrals: 0,
                             refsList: [],
                             invitedBy: startParam || null,
                             createdAt: new Date()
                         });
                         
-                        // Начисление бонуса тому, кто пригласил
                         if (startParam && startParam != telegramUser.id) {
                             const refUserRef = doc(db, "users", startParam.toString());
                             updateDoc(refUserRef, {
                                 refsList: arrayUnion(telegramUser.id),
                                 referrals: increment(1),
-                                balance: increment(50) // Бонус пригласившему
+                                balance: increment(50)
                             }).catch(e => console.log("Referrer not found"));
                         }
                     }
 
-                    // Слушаем изменения баланса в реальном времени
                     onSnapshot(userRef, (snap) => {
                         if (snap.exists()) setDbUser(snap.data());
                     });
@@ -160,9 +146,8 @@
                 initApp();
             }, []);
 
-            // Сохранение настроек админа
             const saveConfigToDb = async (newConfig) => {
-                setConfig(newConfig); // Визуальное обновление
+                setConfig(newConfig);
                 const { doc, updateDoc } = window.fs;
                 const configRef = doc(window.db, "settings", "global");
                 await updateDoc(configRef, newConfig);
@@ -177,12 +162,9 @@
             const handleGenerate = async () => {
                 const price = genType === 'image' ? config.priceImage : config.priceVideo;
                 
-                if (dbUser.balance < price) {
-                    return window.Telegram.WebApp.showAlert(`Нужно ${price} токенов. У вас ${dbUser.balance}.`);
-                }
+                if (dbUser.balance < price) return window.Telegram.WebApp.showAlert(`Нужно ${price} токенов.`);
                 if (!prompt) return;
 
-                // Списываем баланс в БД
                 const { doc, updateDoc, increment } = window.fs;
                 const userRef = doc(window.db, "users", user.id.toString());
                 await updateDoc(userRef, { balance: increment(-price) });
@@ -190,7 +172,6 @@
                 setIsProcessing(true);
                 setResultMedia(null);
 
-                // Имитация API (Здесь потом будет реальный запрос к нейронке)
                 setTimeout(() => {
                     setIsProcessing(false);
                     if (genType === 'image') setResultMedia(`https://placehold.co/600x600/1a1a1a/FFF.png?text=${encodeURIComponent(prompt)}`);
@@ -207,7 +188,6 @@
                 if (dbUser.balance < config.priceText) return window.Telegram.WebApp.showAlert("Недостаточно токенов!");
                 if (!chatInput.trim()) return;
 
-                // Списываем
                 const { doc, updateDoc, increment } = window.fs;
                 const userRef = doc(window.db, "users", user.id.toString());
                 await updateDoc(userRef, { balance: increment(-config.priceText) });
@@ -217,14 +197,14 @@
                 setChatInput('');
                 
                 setTimeout(() => {
-                    setChatHistory(prev => [...prev, { role: 'ai', text: `AI: Я получил запрос "${currentInput}". Это тестовый ответ.` }]);
+                    setChatHistory(prev => [...prev, { role: 'ai', text: `AI: Ответ на "${currentInput}"` }]);
                     window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
                 }, 1000);
             };
             
             useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
 
-            // --- КОМПОНЕНТЫ UI ---
+            // --- КОМПОНЕНТЫ ---
 
             if (isLoading) {
                 return (
@@ -247,7 +227,7 @@
                     </div>
                     <textarea 
                         value={prompt} onChange={e => setPrompt(e.target.value)}
-                        placeholder="Опиши, что создать..."
+                        placeholder="Опиши идею..."
                         className="w-full bg-gray-800 rounded-xl p-4 mb-4 text-white min-h-[120px] border border-gray-700 focus:border-blue-500 outline-none"
                     ></textarea>
                     <button onClick={handleGenerate} disabled={isProcessing} className="w-full bg-gradient-to-r from-blue-600 to-blue-500 py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform">
@@ -275,8 +255,8 @@
             );
 
             const TabProfile = () => {
-                // Генерируем ссылку. В реальном боте замени "YourBotName" на юзернейм своего бота
-                const inviteLink = `https://t.me/YourBotName?start=${user.id}`;
+                // ВОТ ТУТ МЫ ВСТАВИЛИ ТВОЮ ССЫЛКУ
+                const inviteLink = `https://99999cent-bit.github.io/Bot/?start=${user.id}`;
                 
                 const copyLink = () => {
                     navigator.clipboard.writeText(inviteLink);
@@ -297,7 +277,6 @@
                                 </div>
                             </div>
                             
-                            {/* Показываем кнопку админа только если ID совпадает */}
                             {user.id === ADMIN_ID && (
                                 <button onClick={() => setActiveTab('admin')} className="w-full bg-red-900/50 text-red-200 py-2 rounded-lg text-sm mb-4 border border-red-800">
                                     <i className="fas fa-cogs mr-2"></i> Панель Админа
@@ -346,7 +325,7 @@
                             <input type="number" value={config.priceVideo} onChange={e => saveConfigToDb({...config, priceVideo: Number(e.target.value)})} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
                         </div>
                         <div className="bg-green-900/30 p-3 rounded text-xs text-green-200">
-                            <i className="fas fa-cloud mr-1"></i> Изменения сразу применяются для всех пользователей.
+                            <i className="fas fa-cloud mr-1"></i> Изменения сохраняются в облаке.
                         </div>
                     </div>
                 </div>
