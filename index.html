@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Super Bot</title>
+    
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <style>
+        body {
+            background-color: var(--tg-theme-bg-color, #17212b);
+            color: var(--tg-theme-text-color, #ffffff);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+        }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .message-bubble { max-width: 80%; border-radius: 12px; padding: 10px; margin-bottom: 8px; font-size: 14px; }
+        .user-msg { background-color: #3390ec; color: white; align-self: flex-end; border-bottom-right-radius: 2px; }
+        .ai-msg { background-color: #2b2b2b; color: #e4e4e4; align-self: flex-start; border-bottom-left-radius: 2px; }
+        
+        /* Анимация переходов */
+        .page-enter { opacity: 0; transform: translateY(10px); animation: fadeInUp 0.3s forwards; }
+        @keyframes fadeInUp { to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        // ID Админа (Замените на свой ID из Telegram, чтобы видеть панель)
+        // Узнать ID можно в боте @userinfobot
+        const ADMIN_ID = 12345678; 
+
+        const App = () => {
+            const [activeTab, setActiveTab] = useState('generate'); // generate, chat, profile, admin
+            const [user, setUser] = useState({ first_name: 'Guest', id: 0, username: 'guest' });
+            
+            // --- ЭКОНОМИКА И НАСТРОЙКИ (Управляемые Админом) ---
+            const [config, setConfig] = useState({
+                priceImage: 50,
+                priceVideo: 300,
+                priceText: 10,
+                welcomeBonus: 100,
+                referralReward: 50,      // Награда за друга
+                friendsForReward: 1      // Скольких пригласить для награды (обычно 1)
+            });
+
+            // --- СОСТОЯНИЕ ПОЛЬЗОВАТЕЛЯ ---
+            const [tokens, setTokens] = useState(100);
+            const [referrals, setReferrals] = useState(0); // Количество приглашенных
+            const [chatHistory, setChatHistory] = useState([
+                { role: 'ai', text: 'Привет! Я Grok AI. Чем могу помочь?' }
+            ]);
+
+            // Инициализация
+            useEffect(() => {
+                const tg = window.Telegram.WebApp;
+                tg.ready();
+                tg.expand();
+                
+                // 1. Получаем данные юзера
+                if (tg.initDataUnsafe && tg.initDataUnsafe.user) {
+                    setUser(tg.initDataUnsafe.user);
+                } else {
+                    // Для теста в браузере
+                    setUser({ first_name: 'Admin Tester', id: ADMIN_ID, username: 'admin' }); 
+                }
+
+                // 2. Загружаем настройки админа (симуляция БД)
+                const savedConfig = localStorage.getItem('app_config');
+                if (savedConfig) setConfig(JSON.parse(savedConfig));
+
+                // 3. Загружаем данные пользователя
+                const savedTokens = localStorage.getItem('user_tokens');
+                const savedRefs = localStorage.getItem('user_referrals');
+                
+                if (savedTokens) {
+                    setTokens(parseInt(savedTokens));
+                } else {
+                    // Если новый юзер - даем бонус из конфига
+                    setTokens(JSON.parse(savedConfig || '{}').welcomeBonus || 100);
+                }
+                if (savedRefs) setReferrals(parseInt(savedRefs));
+
+            }, []);
+
+            // Сохранение при изменении
+            useEffect(() => { localStorage.setItem('user_tokens', tokens); }, [tokens]);
+            useEffect(() => { localStorage.setItem('user_referrals', referrals); }, [referrals]);
+            useEffect(() => { localStorage.setItem('app_config', JSON.stringify(config)); }, [config]);
+
+            // --- ЛОГИКА ГЕНЕРАЦИИ ---
+            const [genType, setGenType] = useState('image');
+            const [prompt, setPrompt] = useState('');
+            const [isProcessing, setIsProcessing] = useState(false);
+            const [resultMedia, setResultMedia] = useState(null);
+
+            const handleGenerate = () => {
+                const price = genType === 'image' ? config.priceImage : config.priceVideo;
+                if (tokens < price) return window.Telegram.WebApp.showAlert("Недостаточно токенов!");
+                if (!prompt) return;
+
+                setTokens(t => t - price);
+                setIsProcessing(true);
+                setResultMedia(null);
+
+                // Имитация API
+                setTimeout(() => {
+                    setIsProcessing(false);
+                    if (genType === 'image') setResultMedia(`https://placehold.co/600x600/1a1a1a/FFF.png?text=${encodeURIComponent(prompt)}`);
+                    else setResultMedia("https://media.giphy.com/media/l41lI4bYmcsPJX9Nk/giphy.gif");
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }, 2000);
+            };
+
+            // --- ЛОГИКА ЧАТА ---
+            const [chatInput, setChatInput] = useState('');
+            const chatEndRef = useRef(null);
+
+            const handleSendChat = () => {
+                if (tokens < config.priceText) return window.Telegram.WebApp.showAlert("Недостаточно токенов для вопроса!");
+                if (!chatInput.trim()) return;
+
+                setTokens(t => t - config.priceText);
+                const userMsg = { role: 'user', text: chatInput };
+                setChatHistory(prev => [...prev, userMsg]);
+                setChatInput('');
+                
+                // Имитация ответа
+                setTimeout(() => {
+                    const aiMsg = { role: 'ai', text: `Грок думает, что "${userMsg.text}" - это отличный вопрос! (Это демо-ответ)` };
+                    setChatHistory(prev => [...prev, aiMsg]);
+                    window.Telegram.WebApp.HapticFeedback.impactOccurred('light');
+                }, 1000);
+            };
+            
+            useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
+
+            // --- ЛОГИКА РЕФЕРАЛОВ ---
+            const inviteLink = `https://t.me/YourBotName?start=${user.id}`;
+            const copyLink = () => {
+                navigator.clipboard.writeText(inviteLink);
+                window.Telegram.WebApp.showAlert("Ссылка скопирована!");
+            };
+            
+            // Симуляция приглашения друга (для теста)
+            const simInvite = () => {
+                setReferrals(r => r + 1);
+                // Если достигли порога (например, каждый 1 друг), даем награду
+                if ((referrals + 1) % config.friendsForReward === 0) {
+                    setTokens(t => t + config.referralReward);
+                    window.Telegram.WebApp.showAlert(`Друг присоединился! +${config.referralReward} токенов`);
+                }
+            };
+
+            // ================= КОМПОНЕНТЫ =================
+
+            const TabGenerate = () => (
+                <div className="page-enter p-4 pb-24">
+                    <div className="flex bg-gray-800 rounded-lg p-1 mb-6">
+                        <button onClick={() => setGenType('image')} className={`flex-1 py-2 rounded text-sm font-bold ${genType === 'image' ? 'bg-blue-600' : 'text-gray-400'}`}>Картинка ({config.priceImage}т)</button>
+                        <button onClick={() => setGenType('video')} className={`flex-1 py-2 rounded text-sm font-bold ${genType === 'video' ? 'bg-purple-600' : 'text-gray-400'}`}>Видео ({config.priceVideo}т)</button>
+                    </div>
+
+                    <textarea 
+                        value={prompt} onChange={e => setPrompt(e.target.value)}
+                        placeholder={genType === 'image' ? "Например: Кот в космосе..." : "Например: Полет над горами..."}
+                        className="w-full bg-gray-800 rounded-xl p-4 mb-4 text-white min-h-[120px] border border-gray-700 focus:border-blue-500 outline-none"
+                    ></textarea>
+
+                    <button onClick={handleGenerate} disabled={isProcessing} className="w-full bg-gradient-to-r from-blue-600 to-blue-500 py-4 rounded-xl font-bold shadow-lg active:scale-95 transition-transform flex justify-center items-center">
+                        {isProcessing ? <i className="fas fa-spinner fa-spin"></i> : <span>🚀 Сгенерировать</span>}
+                    </button>
+
+                    {resultMedia && (
+                        <div className="mt-6 rounded-xl overflow-hidden border border-gray-700 animate-fade-in">
+                            <img src={resultMedia} className="w-full" alt="Result" />
+                        </div>
+                    )}
+                </div>
+            );
+
+            const TabChat = () => (
+                <div className="page-enter flex flex-col h-[calc(100vh-80px)]">
+                    <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        {chatHistory.map((msg, idx) => (
+                            <div key={idx} className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                <div className={`message-bubble ${msg.role === 'user' ? 'user-msg' : 'ai-msg'}`}>
+                                    {msg.text}
+                                </div>
+                            </div>
+                        ))}
+                        <div ref={chatEndRef} />
+                    </div>
+                    <div className="p-3 bg-gray-900 border-t border-gray-800 flex items-center gap-2">
+                        <input 
+                            value={chatInput} onChange={e => setChatInput(e.target.value)}
+                            placeholder={`Спроси (${config.priceText} ток)...`}
+                            className="flex-1 bg-gray-800 text-white rounded-full px-4 py-2 outline-none border border-gray-700"
+                        />
+                        <button onClick={handleSendChat} className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white active:scale-90 transition">
+                            <i className="fas fa-paper-plane"></i>
+                        </button>
+                    </div>
+                </div>
+            );
+
+            const TabProfile = () => (
+                <div className="page-enter p-4 pb-24">
+                    <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 mb-6 border border-gray-700">
+                        <div className="flex justify-between items-start mb-4">
+                            <div>
+                                <h2 className="text-xl font-bold">{user.first_name}</h2>
+                                <p className="text-gray-400 text-sm">@{user.username || 'user'}</p>
+                            </div>
+                            <div className="text-right">
+                                <span className="block text-3xl font-bold text-yellow-500">{tokens}</span>
+                                <span className="text-xs text-gray-400">TOKENS</span>
+                            </div>
+                        </div>
+                        
+                        {/* Кнопка Админа (видна только если ID совпадает) */}
+                        {user.id === ADMIN_ID && (
+                            <button onClick={() => setActiveTab('admin')} className="w-full bg-red-900/50 text-red-200 py-2 rounded-lg text-sm mb-4 border border-red-800">
+                                <i className="fas fa-cogs mr-2"></i> Панель Админа
+                            </button>
+                        )}
+                        
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="bg-gray-800/50 p-3 rounded-xl text-center">
+                                <i className="fas fa-image text-blue-400 mb-1"></i>
+                                <p className="text-xs text-gray-400">Генераций</p>
+                                <p className="font-bold">0</p>
+                            </div>
+                            <div className="bg-gray-800/50 p-3 rounded-xl text-center">
+                                <i className="fas fa-users text-green-400 mb-1"></i>
+                                <p className="text-xs text-gray-400">Друзей</p>
+                                <p className="font-bold">{referrals}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-800 rounded-2xl p-6 border border-gray-700">
+                        <h3 className="font-bold mb-2 flex items-center">
+                            <i className="fas fa-gift text-pink-500 mr-2"></i> Пригласи друга
+                        </h3>
+                        <p className="text-sm text-gray-400 mb-4">
+                            Получи <b>{config.referralReward} токенов</b> за каждого {config.friendsForReward}-го друга!
+                        </p>
+                        
+                        <div className="bg-black/30 p-3 rounded-lg flex items-center justify-between mb-4">
+                            <code className="text-xs text-blue-300 truncate max-w-[200px]">{inviteLink}</code>
+                            <button onClick={copyLink} className="text-white bg-blue-600 px-3 py-1 rounded text-xs font-bold">
+                                Копия
+                            </button>
+                        </div>
+                        
+                        <button onClick={simInvite} className="w-full border border-dashed border-gray-600 py-2 rounded text-xs text-gray-500 hover:text-white">
+                            (Тест) Симулировать вход друга
+                        </button>
+                    </div>
+                </div>
+            );
+
+            const TabAdmin = () => (
+                <div className="page-enter p-4 pb-24">
+                    <div className="flex items-center mb-6">
+                        <button onClick={() => setActiveTab('profile')} className="mr-4 text-gray-400"><i className="fas fa-arrow-left"></i></button>
+                        <h2 className="text-xl font-bold text-red-400">Настройки Бота</h2>
+                    </div>
+
+                    <div className="space-y-4">
+                        <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                            <h3 className="text-sm font-bold text-gray-400 mb-3 uppercase">Тарифы (Токены)</h3>
+                            
+                            <div className="grid grid-cols-2 gap-4 mb-3">
+                                <div>
+                                    <label className="text-xs text-gray-500">Картинка</label>
+                                    <input type="number" value={config.priceImage} onChange={e => setConfig({...config, priceImage: Number(e.target.value)})} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500">Видео</label>
+                                    <input type="number" value={config.priceVideo} onChange={e => setConfig({...config, priceVideo: Number(e.target.value)})} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs text-gray-500">Текстовый запрос (AI чат)</label>
+                                <input type="number" value={config.priceText} onChange={e => setConfig({...config, priceText: Number(e.target.value)})} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                            <h3 className="text-sm font-bold text-gray-400 mb-3 uppercase">Маркетинг</h3>
+                            
+                            <div className="mb-3">
+                                <label className="text-xs text-gray-500">Бонус за регистрацию</label>
+                                <input type="number" value={config.welcomeBonus} onChange={e => setConfig({...config, welcomeBonus: Number(e.target.value)})} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs text-gray-500">Награда за друга</label>
+                                    <input type="number" value={config.referralReward} onChange={e => setConfig({...config, referralReward: Number(e.target.value)})} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                </div>
+                                <div>
+                                    <label className="text-xs text-gray-500">Цель (кол-во друзей)</label>
+                                    <input type="number" value={config.friendsForReward} onChange={e => setConfig({...config, friendsForReward: Number(e.target.value)})} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="bg-green-900/30 p-4 rounded-xl border border-green-800">
+                            <p className="text-sm text-green-200"><i className="fas fa-save mr-2"></i> Настройки сохраняются автоматически в хранилище приложения.</p>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            // Нижнее меню
+            const NavItem = ({ id, icon, label }) => (
+                <button 
+                    onClick={() => setActiveTab(id)}
+                    className={`flex flex-col items-center space-y-1 w-16 transition-all ${activeTab === id ? 'text-blue-500 scale-110' : 'text-gray-500'}`}
+                >
+                    <i className={`fas ${icon} text-xl`}></i>
+                    <span className="text-[10px] font-medium">{label}</span>
+                </button>
+            );
+
+            return (
+                <div className="min-h-screen bg-[#17212b]">
+                    {activeTab === 'generate' && <TabGenerate />}
+                    {activeTab === 'chat' && <TabChat />}
+                    {activeTab === 'profile' && <TabProfile />}
+                    {activeTab === 'admin' && <TabAdmin />}
+
+                    {/* Навигация */}
+                    <div className="fixed bottom-0 left-0 right-0 bg-[#1c2936] border-t border-gray-800 pb-safe pt-2 px-6 flex justify-around z-40 h-[70px]">
+                        <NavItem id="generate" icon="fa-wand-magic-sparkles" label="Имидж" />
+                        <NavItem id="chat" icon="fa-comments" label="Чат" />
+                        <NavItem id="profile" icon="fa-user-astronaut" label="Профиль" />
+                    </div>
+                </div>
+            );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
+
