@@ -18,9 +18,9 @@
             color: var(--tg-theme-text-color, #ffffff);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             overflow-x: hidden;
-            /* Убрали overflow:hidden, чтобы скролл работал нормально с fixed меню */
             min-height: 100vh; 
             margin: 0;
+            padding-bottom: 80px; /* Отступ для меню */
         }
         
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -29,7 +29,6 @@
         .user-msg { background-color: #3390ec; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
         .ai-msg { background-color: #2b2b2b; color: #e4e4e4; align-self: flex-start; border-bottom-left-radius: 4px; }
         
-        /* Анимации */
         .page-enter { opacity: 0; animation: fadeIn 0.3s forwards; }
         @keyframes fadeIn { to { opacity: 1; } }
         .slide-down { animation: slideDown 0.4s ease-out; }
@@ -93,8 +92,6 @@
             const [globalHistory, setGlobalHistory] = useState([]);
 
             const [payModalData, setPayModalData] = useState(null);
-            const [shareModalItem, setShareModalItem] = useState(null);
-
             const [dbUser, setDbUser] = useState({ balance: 0, referrals: 0, firstName: '', spent: 0 });
             
             const [config, setConfig] = useState({
@@ -214,7 +211,6 @@
                     if (success) {
                         setTimeout(() => {
                             setIsProc(false);
-                            // Используем стабильные источники
                             const newUrl = genType === 'image' 
                                 ? `https://placehold.co/600x600/1a1a1a/FFF.png?text=${encodeURIComponent(prompt)}` 
                                 : "https://www.w3schools.com/html/mov_bbb.mp4";
@@ -227,7 +223,6 @@
                                 date: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                             };
                             setGlobalHistory(prev => [newItem, ...prev]);
-                            
                             window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                         }, 2500);
                     } else {
@@ -235,37 +230,57 @@
                     }
                 };
 
+                // ИСПРАВЛЕННАЯ ФУНКЦИЯ СКАЧИВАНИЯ
                 const downloadMedia = async (url, filename) => {
-                    // Метод скачивания через Blob
+                    const tg = window.Telegram.WebApp;
+                    tg.HapticFeedback.impactOccurred('medium');
+                    
                     try {
                         const response = await fetch(url);
-                        if (!response.ok) throw new Error("Network error");
+                        if (!response.ok) throw new Error("Ошибка загрузки");
+                        
                         const blob = await response.blob();
                         const blobUrl = window.URL.createObjectURL(blob);
                         
                         const link = document.createElement('a');
                         link.href = blobUrl;
-                        link.download = filename || `file_${Date.now()}`;
+                        link.download = filename;
+                        link.style.display = 'none';
                         document.body.appendChild(link);
                         link.click();
                         document.body.removeChild(link);
-                        window.URL.revokeObjectURL(blobUrl);
                         
-                        // Если это фото, можно попробовать отправить уведомление
-                        window.Telegram.WebApp.showAlert("Файл отправлен в загрузки. Проверьте папку Downloads.");
+                        setTimeout(() => window.URL.revokeObjectURL(blobUrl), 100);
+                        tg.showAlert("Файл отправлен в загрузки. Проверьте галерею или папку 'Файлы'.");
                     } catch (e) {
-                        window.Telegram.WebApp.openLink(url);
+                        // Фолбек: открываем в новом окне
+                        tg.openLink(url);
                     }
                 };
 
-                const openShareModal = (item) => {
-                    setShareModalItem(item);
+                // ИСПРАВЛЕННАЯ ФУНКЦИЯ "ПОДЕЛИТЬСЯ"
+                const shareMedia = async (item) => {
+                    if (navigator.share) {
+                        try {
+                            await navigator.share({
+                                title: 'AI Generator',
+                                text: `Смотри, что я создал: ${item.prompt}`,
+                                url: item.url
+                            });
+                        } catch (error) {
+                            console.log('Error sharing:', error);
+                        }
+                    } else {
+                        // Если share не поддерживается (например, на Desktop), копируем ссылку
+                        navigator.clipboard.writeText(item.url);
+                        window.Telegram.WebApp.showAlert("Ссылка скопирована в буфер обмена!");
+                    }
                 };
 
                 const filteredHistory = globalHistory.filter(item => item.type === genType);
 
                 return (
-                    <div className="page-enter p-5 pb-24">
+                    <div className="page-enter p-5">
                         <div className="flex justify-between mb-4">
                             <span className="text-gray-400">Баланс: <b className="text-yellow-400">{user.id === ADMIN_ID ? '∞ (Admin)' : dbUser.balance}</b></span>
                         </div>
@@ -304,7 +319,7 @@
                                         <button onClick={() => downloadMedia(item.url, `${item.type}_${item.id}.${item.type==='image'?'png':'mp4'}`)} className="media-btn border-r border-[#2b3c4e]">
                                             <i className="fas fa-file-download mr-2"></i> Скачать
                                         </button>
-                                        <button onClick={() => openShareModal(item)} className="media-btn">
+                                        <button onClick={() => shareMedia(item)} className="media-btn">
                                             <i className="fas fa-share-nodes mr-2"></i> Поделиться
                                         </button>
                                     </div>
@@ -335,8 +350,7 @@
                 useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
 
                 return (
-                    // pb-[90px] чтобы не скрывалось за нижним меню
-                    <div className="page-enter flex flex-col h-full relative pb-[90px]">
+                    <div className="page-enter flex flex-col h-full relative">
                         <div className="flex-1 overflow-y-auto p-4 space-y-3">
                             {chatHistory.map((m, i) => (
                                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -377,11 +391,12 @@
                 };
 
                 return (
-                    <div className="page-enter p-5 pb-24">
+                    <div className="page-enter p-5">
                         <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 mb-4 border border-gray-700 shadow-lg">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h2 className="text-2xl font-bold">{user.first_name}</h2>
+                                    {/* ЦВЕТ ИМЕНИ ИЗМЕНЕН НА БЕЛЫЙ */}
+                                    <h2 className="text-2xl font-bold text-white">{user.first_name}</h2>
                                     <p className="text-gray-400 text-sm">ID: {user.id}</p>
                                 </div>
                                 <div className="text-right">
@@ -561,7 +576,7 @@
                 useEffect(() => { if (subTab === 'stats') loadStats(); }, [subTab, filterPeriod, searchQuery, customStart, customEnd]);
 
                 return (
-                    <div className="page-enter p-5 pb-24">
+                    <div className="page-enter p-5">
                         <div className="flex items-center justify-between mb-4">
                             <button onClick={() => setActiveTab('profile')} className="text-gray-400 flex items-center"><i className="fas fa-arrow-left mr-2"></i> Назад</button>
                             <div className="bg-gray-800 rounded-lg p-1 flex">
