@@ -18,9 +18,9 @@
             color: var(--tg-theme-text-color, #ffffff);
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
             overflow-x: hidden;
-            /* Убрали overflow:hidden, чтобы скролл работал нормально с fixed меню */
             min-height: 100vh; 
             margin: 0;
+            padding-bottom: 80px; /* Отступ под меню */
         }
         
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -35,9 +35,12 @@
         .slide-down { animation: slideDown 0.4s ease-out; }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.8); z-index: 100; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .modal-content { background: #1c2936; padding: 20px; border-radius: 20px; width: 90%; max-width: 350px; text-align: center; border: 1px solid #3390ec; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
+        .modal-content { background: #1c2936; padding: 20px; border-radius: 20px; width: 90%; max-width: 350px; text-align: center; border: 1px solid #3390ec; position: relative; }
         
+        .fullscreen-media { max-width: 100%; max-height: 90vh; object-fit: contain; }
+        .close-fs-btn { position: absolute; top: 20px; right: 20px; color: white; font-size: 30px; background: rgba(0,0,0,0.5); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 101; cursor: pointer; }
+
         .tariff-card { background: linear-gradient(145deg, #2b3c4e, #1c2936); border: 1px solid #334e68; transition: transform 0.1s; position: relative; overflow: hidden; }
         .tariff-card:active { transform: scale(0.98); }
 
@@ -45,6 +48,9 @@
         .media-actions { display: flex; border-top: 1px solid #2b3c4e; }
         .media-btn { flex: 1; padding: 12px; text-align: center; color: #3390ec; font-weight: bold; font-size: 14px; background: rgba(255,255,255,0.02); }
         .media-btn:active { background: rgba(255,255,255,0.05); }
+
+        .chat-input-area { position: fixed; bottom: 70px; left: 0; right: 0; background: #17212b; padding: 10px; border-top: 1px solid #2b2b2b; z-index: 40; }
+        .chat-container { padding-bottom: 150px; } 
     </style>
 </head>
 <body>
@@ -57,7 +63,6 @@
             getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion, collection, getDocs, query, where 
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-        // ТВОЙ КОНФИГ FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyCbzbhEn__nA9TXawnqRVU2DbZFyeJa_2U",
             authDomain: "aigenerator75-3fb8e.firebaseapp.com",
@@ -81,19 +86,19 @@
     <script type="text/babel">
         const { useState, useEffect, useRef, useMemo } = React;
         
-        // ID Админа
         const ADMIN_ID = 442529744; 
 
         const App = () => {
             const [activeTab, setActiveTab] = useState('generate');
+            const [genType, setGenType] = useState('image'); 
+            
             const [user, setUser] = useState(null);
             const [isLoading, setIsLoading] = useState(true);
-            
-            // Храним историю глобально
             const [globalHistory, setGlobalHistory] = useState([]);
 
             const [payModalData, setPayModalData] = useState(null);
             const [shareModalItem, setShareModalItem] = useState(null);
+            const [fullscreenItem, setFullscreenItem] = useState(null); 
 
             const [dbUser, setDbUser] = useState({ balance: 0, referrals: 0, firstName: '', spent: 0 });
             
@@ -119,13 +124,14 @@
                     const tg = window.Telegram.WebApp;
                     tg.ready();
                     tg.expand();
+                    tg.enableClosingConfirmation();
 
                     let telegramUser = tg.initDataUnsafe?.user;
                     if (!telegramUser) telegramUser = { id: ADMIN_ID, first_name: 'Загрузка...', username: 'admin' };
                     
                     if (!window.firebaseReady) await new Promise(r => document.addEventListener('firebase-ready', r));
 
-                    const { doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion } = window.fs;
+                    const { doc, getDoc, setDoc, updateDoc, onSnapshot, increment } = window.fs;
                     const db = window.db;
 
                     const configRef = doc(db, "settings", "global");
@@ -154,10 +160,13 @@
 
                         if (startParam && startParam != telegramUser.id) {
                             const refUserRef = doc(db, "users", startParam.toString());
-                            updateDoc(refUserRef, {
-                                referrals: increment(1),
-                                balance: increment(config.referralReward || 50) 
-                            }).catch(e => console.log("Ref error"));
+                            const refSnap = await getDoc(refUserRef);
+                            if(refSnap.exists()){
+                                updateDoc(refUserRef, {
+                                    referrals: increment(1),
+                                    balance: increment(config.referralReward || 50) 
+                                }).catch(e => console.log("Ref error", e));
+                            }
                         }
                         setUser({ ...telegramUser, first_name: realName });
                     } else {
@@ -198,11 +207,9 @@
                 await window.fs.updateDoc(window.fs.doc(window.db, "users", user.id.toString()), { balance: window.fs.increment(-config.priceText) });
                 return true;
             };
-
             // --- TABS ---
 
             const TabGenerate = () => {
-                const [genType, setGenType] = useState('image');
                 const [prompt, setPrompt] = useState('');
                 const [isProc, setIsProc] = useState(false);
 
@@ -214,7 +221,6 @@
                     if (success) {
                         setTimeout(() => {
                             setIsProc(false);
-                            // Используем стабильные источники
                             const newUrl = genType === 'image' 
                                 ? `https://placehold.co/600x600/1a1a1a/FFF.png?text=${encodeURIComponent(prompt)}` 
                                 : "https://www.w3schools.com/html/mov_bbb.mp4";
@@ -227,7 +233,6 @@
                                 date: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
                             };
                             setGlobalHistory(prev => [newItem, ...prev]);
-                            
                             window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                         }, 2500);
                     } else {
@@ -235,27 +240,15 @@
                     }
                 };
 
-                const downloadMedia = async (url, filename) => {
-                    // Метод скачивания через Blob
-                    try {
-                        const response = await fetch(url);
-                        if (!response.ok) throw new Error("Network error");
-                        const blob = await response.blob();
-                        const blobUrl = window.URL.createObjectURL(blob);
-                        
-                        const link = document.createElement('a');
-                        link.href = blobUrl;
-                        link.download = filename || `file_${Date.now()}`;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                        window.URL.revokeObjectURL(blobUrl);
-                        
-                        // Если это фото, можно попробовать отправить уведомление
-                        window.Telegram.WebApp.showAlert("Файл отправлен в загрузки. Проверьте папку Downloads.");
-                    } catch (e) {
-                        window.Telegram.WebApp.openLink(url);
-                    }
+                const downloadMedia = (url, filename) => {
+                    window.Telegram.WebApp.openLink(url, {try_instant_view: false});
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = filename || 'download';
+                    link.target = "_blank"; 
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
                 };
 
                 const openShareModal = (item) => {
@@ -293,7 +286,7 @@
                                         <span className="text-xs text-gray-400 truncate max-w-[70%]">{item.prompt}</span>
                                         <span className="text-[10px] text-gray-500">{item.date}</span>
                                     </div>
-                                    <div className="bg-black flex justify-center items-center min-h-[200px]">
+                                    <div className="bg-black flex justify-center items-center min-h-[200px] cursor-pointer" onClick={() => setFullscreenItem(item)}>
                                         {item.type === 'image' ? (
                                             <img src={item.url} className="max-w-full max-h-[400px] object-contain" alt="Gen" />
                                         ) : (
@@ -335,9 +328,8 @@
                 useEffect(() => { endRef.current?.scrollIntoView({ behavior: "smooth" }); }, [chatHistory]);
 
                 return (
-                    // pb-[90px] чтобы не скрывалось за нижним меню
-                    <div className="page-enter flex flex-col h-full relative pb-[90px]">
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    <div className="page-enter flex flex-col h-full relative">
+                        <div className="flex-1 overflow-y-auto p-4 space-y-3 chat-container">
                             {chatHistory.map((m, i) => (
                                 <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                     <div className={`message-bubble ${m.role === 'user' ? 'user-msg' : 'ai-msg'}`}>{m.text}</div>
@@ -346,7 +338,7 @@
                             <div ref={endRef} />
                         </div>
                         
-                        <div className="bg-[#17212b] p-3 border-t border-gray-800 flex items-center gap-2 shrink-0">
+                        <div className="chat-input-area flex items-center gap-2">
                             <input 
                                 value={txt} 
                                 onChange={e => setTxt(e.target.value)} 
@@ -360,15 +352,13 @@
             };
 
             const TabProfile = () => {
-                const link = `https://99999cent-bit.github.io/Bot/?start=${user.id}`;
+                const link = `https://t.me/Ai_Generator75_Bot?start=${user.id}`;
                 const [buyAmount, setBuyAmount] = useState(100);
                 
-                const totalPrice = Math.ceil(buyAmount * config.tokenPriceRub);
+                const totalPrice = Math.ceil((Number(buyAmount) || 0) * config.tokenPriceRub);
 
                 const handleCustomBuy = () => {
-                    if (buyAmount < 100) {
-                        return window.Telegram.WebApp.showAlert("Минимальная покупка — 100 токенов!");
-                    }
+                    if (buyAmount < 100) return window.Telegram.WebApp.showAlert("Минимальная покупка — 100 токенов!");
                     setPayModalData({ name: 'Пополнение баланса', tokens: buyAmount, price: totalPrice });
                 };
                 
@@ -381,7 +371,7 @@
                         <div className="bg-gradient-to-br from-gray-800 to-gray-900 rounded-2xl p-6 mb-4 border border-gray-700 shadow-lg">
                             <div className="flex justify-between items-start mb-4">
                                 <div>
-                                    <h2 className="text-2xl font-bold">{user.first_name}</h2>
+                                    <h2 className="text-2xl font-bold text-white">{user.first_name}</h2>
                                     <p className="text-gray-400 text-sm">ID: {user.id}</p>
                                 </div>
                                 <div className="text-right">
@@ -393,13 +383,29 @@
                             </div>
                             
                             {user.id === ADMIN_ID && (
-                                <button onClick={() => setActiveTab('admin')} className="w-full bg-gray-700 py-2 rounded-xl font-medium text-sm border border-gray-600 mb-2">
+                                <button onClick={() => setActiveTab('admin')} className="w-full bg-gray-700 py-2 rounded-xl font-medium text-sm border border-gray-600 mb-2 text-white">
                                     <i className="fas fa-cog mr-2"></i> Админ панель
                                 </button>
                             )}
                         </div>
 
-                        <h3 className="text-lg font-bold mb-3 pl-1 text-white">📦 Готовые пакеты</h3>
+                        <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
+                            <h3 className="font-bold text-lg mb-2 text-white">🎁 Пригласи друга</h3>
+                            <p className="text-sm text-gray-300 mb-4">
+                                Награда: <b className="text-yellow-400">{config.referralReward} токенов</b>
+                            </p>
+                            <p className="text-xs text-gray-500 mb-2">Награда зачисляется, только если друг запускает бота впервые.</p>
+                            <div className="flex gap-2">
+                                <div className="bg-black/40 p-3 rounded-lg flex-1 overflow-hidden">
+                                    <p className="text-xs text-gray-400 truncate">{link}</p>
+                                </div>
+                                <button onClick={() => {navigator.clipboard.writeText(link); window.Telegram.WebApp.showAlert("Скопировано!");}} className="bg-blue-600 px-4 rounded-lg font-bold text-sm text-white">
+                                    Копия
+                                </button>
+                            </div>
+                        </div>
+
+                        <h3 className="text-lg font-bold mb-3 pl-1 text-white">📦 Пакеты токенов</h3>
                         <div className="grid gap-3 mb-6">
                             {(config.tariffs || []).map(tariff => (
                                 <div key={tariff.id} className="tariff-card rounded-xl p-4 flex justify-between items-center cursor-pointer" 
@@ -422,67 +428,48 @@
 
                         <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
                             <h3 className="font-bold text-lg mb-3 text-white"><i className="fas fa-calculator text-gray-400 mr-2"></i>Свой вариант</h3>
-                            
                             <div className="mb-4">
                                 <label className="text-xs text-gray-400 mb-1 block">Количество (минимум 100):</label>
                                 <div className="flex items-center bg-gray-900 rounded-xl border border-gray-600 overflow-hidden">
                                     <input 
                                         type="number" 
                                         value={buyAmount}
-                                        onChange={e => setBuyAmount(Math.max(1, Number(e.target.value)))}
+                                        onChange={e => setBuyAmount(e.target.value === '' ? '' : Number(e.target.value))}
                                         className="flex-1 bg-transparent p-3 text-white outline-none font-mono"
                                     />
                                     <span className="pr-4 text-gray-500 text-sm">шт.</span>
                                 </div>
                                 <p className="text-xs text-gray-500 mt-2">Курс: 1 токен = {config.tokenPriceRub} ₽</p>
                             </div>
-
-                            <button onClick={handleCustomBuy} className="w-full bg-green-600 hover:bg-green-500 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex justify-center items-center">
+                            <button onClick={handleCustomBuy} className="w-full bg-green-600 hover:bg-green-500 py-3 rounded-xl font-bold shadow-lg transition-transform active:scale-95 flex justify-center items-center text-white">
                                 <span>Купить за {totalPrice} ₽</span>
                             </button>
-                        </div>
-
-                        <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700">
-                            <h3 className="font-bold text-lg mb-2 text-white">🎁 Пригласи друга</h3>
-                            <p className="text-sm text-gray-300 mb-4">
-                                Награда: <b className="text-yellow-400">{config.referralReward} токенов</b>
-                            </p>
-                            <div className="flex gap-2">
-                                <div className="bg-black/40 p-3 rounded-lg flex-1 overflow-hidden">
-                                    <p className="text-xs text-gray-400 truncate">{link}</p>
-                                </div>
-                                <button onClick={() => {navigator.clipboard.writeText(link); window.Telegram.WebApp.showAlert("Скопировано!");}} className="bg-blue-600 px-4 rounded-lg font-bold text-sm">
-                                    Копия
-                                </button>
-                            </div>
                         </div>
                     </div>
                 );
             };
-
             const TabAdmin = () => {
                 const [subTab, setSubTab] = useState('settings'); 
                 const [localConfig, setLocalConfig] = useState(config);
-                
                 const [stats, setStats] = useState({ users: 0, sold: 0, revenue: 0, loading: false });
                 const [filterPeriod, setFilterPeriod] = useState('all'); 
                 const [customStart, setCustomStart] = useState('');
                 const [customEnd, setCustomEnd] = useState('');
-
                 const [searchQuery, setSearchQuery] = useState('');
                 const [userResults, setUserResults] = useState([]);
-
                 const [grantId, setGrantId] = useState('');
                 const [grantAmount, setGrantAmount] = useState('');
 
                 const handleChange = (field, val) => {
-                    setLocalConfig(prev => ({ ...prev, [field]: val }));
+                    const cleanVal = (val === '' && typeof config[field] === 'number') ? '' : val;
+                    setLocalConfig(prev => ({ ...prev, [field]: cleanVal }));
                 };
 
                 const updateTariff = (id, field, val) => {
+                    const cleanVal = (val === '' && field !== 'name') ? '' : val;
                     setLocalConfig(prev => ({
                         ...prev,
-                        tariffs: prev.tariffs.map(t => t.id === id ? { ...t, [field]: val } : t)
+                        tariffs: prev.tariffs.map(t => t.id === id ? { ...t, [field]: cleanVal } : t)
                     }));
                 };
                 
@@ -496,9 +483,7 @@
                     setLocalConfig(prev => ({ ...prev, tariffs: [...(prev.tariffs || []), newTariff] }));
                 };
 
-                const save = () => {
-                    saveConfigToDb(localConfig);
-                };
+                const save = () => saveConfigToDb(localConfig);
 
                 const handleGrantTokens = async () => {
                     if(!grantId || !grantAmount) return window.Telegram.WebApp.showAlert("Заполните ID и Сумму");
@@ -545,11 +530,15 @@
 
                         if (include) {
                             totalUsers++; totalSold += (data.balance || 0); totalRevenue += (data.spent || 0); 
-                        }
-                        
-                        if (searchQuery) {
+                            
+                            // ЛОГИКА ОТОБРАЖЕНИЯ СПИСКА (Теперь добавляем, если подходит под фильтр даты)
                             const q = searchQuery.toLowerCase();
-                            if (data.username?.toLowerCase().includes(q) || data.firstName?.toLowerCase().includes(q) || doc.id.includes(q)) {
+                            const matchesSearch = !searchQuery || 
+                                                  data.username?.toLowerCase().includes(q) || 
+                                                  data.firstName?.toLowerCase().includes(q) || 
+                                                  doc.id.includes(q);
+                            
+                            if (matchesSearch) {
                                 filteredUsers.push({id: doc.id, ...data});
                             }
                         }
@@ -565,8 +554,8 @@
                         <div className="flex items-center justify-between mb-4">
                             <button onClick={() => setActiveTab('profile')} className="text-gray-400 flex items-center"><i className="fas fa-arrow-left mr-2"></i> Назад</button>
                             <div className="bg-gray-800 rounded-lg p-1 flex">
-                                <button onClick={() => setSubTab('settings')} className={`px-3 py-1 rounded text-xs font-bold ${subTab==='settings'?'bg-blue-600':'text-gray-500'}`}>Настройки</button>
-                                <button onClick={() => setSubTab('stats')} className={`px-3 py-1 rounded text-xs font-bold ${subTab==='stats'?'bg-purple-600':'text-gray-500'}`}>Статистика</button>
+                                <button onClick={() => setSubTab('settings')} className={`px-3 py-1 rounded text-xs font-bold ${subTab==='settings'?'bg-blue-600 text-white':'text-gray-500'}`}>Настройки</button>
+                                <button onClick={() => setSubTab('stats')} className={`px-3 py-1 rounded text-xs font-bold ${subTab==='stats'?'bg-purple-600 text-white':'text-gray-500'}`}>Статистика</button>
                             </div>
                         </div>
 
@@ -574,13 +563,13 @@
                             <div className="space-y-4 page-enter">
                                 <div className="flex justify-between items-center mb-2">
                                     <h2 className="text-xl font-bold text-white">⚙️ Конфиг</h2>
-                                    <button onClick={save} className="bg-blue-600 px-4 py-2 rounded-lg font-bold text-xs shadow-lg active:scale-95">💾 Сохранить</button>
+                                    <button onClick={save} className="bg-blue-600 px-4 py-2 rounded-lg font-bold text-xs text-white shadow-lg active:scale-95">💾 Сохранить</button>
                                 </div>
                                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
                                     <h3 className="text-purple-400 font-bold mb-3 text-xs uppercase">💰 Экономика</h3>
                                     <div>
                                         <label className="text-xs text-gray-500 block mb-1">Курс (RUB за 1 токен)</label>
-                                        <input type="number" step="0.01" value={localConfig.tokenPriceRub} onChange={e => handleChange('tokenPriceRub', parseFloat(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                        <input type="number" step="0.01" value={localConfig.tokenPriceRub} onChange={e => handleChange('tokenPriceRub', e.target.value === '' ? '' : parseFloat(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
                                     </div>
                                 </div>
                                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
@@ -588,11 +577,11 @@
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="text-xs text-gray-500 block mb-1">Новичку</label>
-                                            <input type="number" value={localConfig.welcomeBonus} onChange={e => handleChange('welcomeBonus', Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                            <input type="number" value={localConfig.welcomeBonus} onChange={e => handleChange('welcomeBonus', e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
                                         </div>
                                         <div>
                                             <label className="text-xs text-gray-500 block mb-1">За друга</label>
-                                            <input type="number" value={localConfig.referralReward} onChange={e => handleChange('referralReward', Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                            <input type="number" value={localConfig.referralReward} onChange={e => handleChange('referralReward', e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
                                         </div>
                                     </div>
                                 </div>
@@ -606,7 +595,7 @@
                                             <input type="number" placeholder="Сумма" value={grantAmount} onChange={e => setGrantAmount(e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700 text-sm"/>
                                         </div>
                                     </div>
-                                    <button onClick={handleGrantTokens} className="w-full mt-2 bg-pink-600 hover:bg-pink-500 py-2 rounded-lg font-bold text-xs">Начислить</button>
+                                    <button onClick={handleGrantTokens} className="w-full mt-2 bg-pink-600 hover:bg-pink-500 py-2 rounded-lg font-bold text-xs text-white">Начислить</button>
                                 </div>
                                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
                                     <h3 className="text-orange-400 font-bold mb-3 text-sm uppercase">📦 Тарифы</h3>
@@ -621,11 +610,11 @@
                                                     </div>
                                                     <div>
                                                         <label className="text-[10px] text-gray-500">Токенов</label>
-                                                        <input type="number" value={t.tokens} onChange={e => updateTariff(t.id, 'tokens', Number(e.target.value))} className="w-full bg-[#1c2936] rounded p-1 text-sm text-white border border-gray-600"/>
+                                                        <input type="number" value={t.tokens} onChange={e => updateTariff(t.id, 'tokens', e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-[#1c2936] rounded p-1 text-sm text-white border border-gray-600"/>
                                                     </div>
                                                     <div>
                                                         <label className="text-[10px] text-gray-500">Цена (RUB)</label>
-                                                        <input type="number" value={t.price} onChange={e => updateTariff(t.id, 'price', Number(e.target.value))} className="w-full bg-[#1c2936] rounded p-1 text-sm text-white border border-gray-600"/>
+                                                        <input type="number" value={t.price} onChange={e => updateTariff(t.id, 'price', e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-[#1c2936] rounded p-1 text-sm text-white border border-gray-600"/>
                                                     </div>
                                                 </div>
                                             </div>
@@ -638,15 +627,15 @@
                                     <div className="grid grid-cols-2 gap-3">
                                         <div>
                                             <label className="text-xs text-gray-500 block mb-1">Фото</label>
-                                            <input type="number" value={localConfig.priceImage} onChange={e => handleChange('priceImage', Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                            <input type="number" value={localConfig.priceImage} onChange={e => handleChange('priceImage', e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
                                         </div>
                                         <div>
                                             <label className="text-xs text-gray-500 block mb-1">Видео</label>
-                                            <input type="number" value={localConfig.priceVideo} onChange={e => handleChange('priceVideo', Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                            <input type="number" value={localConfig.priceVideo} onChange={e => handleChange('priceVideo', e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
                                         </div>
                                         <div className="col-span-2">
                                             <label className="text-xs text-gray-500 block mb-1">Сообщение</label>
-                                            <input type="number" value={localConfig.priceText} onChange={e => handleChange('priceText', Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
+                                            <input type="number" value={localConfig.priceText} onChange={e => handleChange('priceText', e.target.value === '' ? '' : Number(e.target.value))} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700"/>
                                         </div>
                                     </div>
                                 </div>
@@ -702,20 +691,33 @@
                                     </div>
                                 )}
                                 <div className="mt-6">
-                                    <h3 className="text-sm font-bold text-gray-300 mb-2">Поиск клиента</h3>
-                                    <input type="text" placeholder="ID или Имя..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-gray-900 rounded-lg p-2 text-sm text-white border border-gray-700 mb-2"/>
-                                    {searchQuery && (
-                                        <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 max-h-40 overflow-y-auto">
-                                            {userResults.length === 0 ? <div className="p-2 text-xs text-gray-500">Нет совпадений</div> : userResults.map(u => (
-                                                <div key={u.id} className="p-2 border-b border-gray-800 text-xs flex justify-between">
-                                                    <span>{u.firstName}</span>
-                                                    <span className="text-yellow-500">{u.balance} т.</span>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
+                                    <h3 className="text-sm font-bold text-gray-300 mb-2">Пользователи</h3>
+                                    <input type="text" placeholder="Поиск по ID или Имени..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-gray-900 rounded-lg p-2 text-sm text-white border border-gray-700 mb-2"/>
+                                    
+                                    <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 max-h-40 overflow-y-auto">
+                                        {userResults.length === 0 ? <div className="p-2 text-xs text-gray-500">Список пуст</div> : userResults.map(u => (
+                                            <div key={u.id} className="p-2 border-b border-gray-800 text-xs flex justify-between">
+                                                <span className="text-white">{u.firstName} <span className="text-[10px] text-gray-500">({u.id})</span></span>
+                                                <span className="text-yellow-500">{u.balance} т.</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
+                        )}
+                    </div>
+                );
+            };
+
+            const FullScreenModal = () => {
+                if (!fullscreenItem) return null;
+                return (
+                    <div className="modal-overlay" onClick={() => setFullscreenItem(null)}>
+                        <div className="close-fs-btn" onClick={() => setFullscreenItem(null)}>&times;</div>
+                        {fullscreenItem.type === 'image' ? (
+                            <img src={fullscreenItem.url} className="fullscreen-media" onClick={e => e.stopPropagation()} />
+                        ) : (
+                            <video src={fullscreenItem.url} controls autoPlay className="fullscreen-media" onClick={e => e.stopPropagation()} />
                         )}
                     </div>
                 );
@@ -752,14 +754,15 @@
                 };
 
                 const nativeShare = () => {
+                    window.Telegram.WebApp.switchInlineQuery(prompt);
+                    setShareModalItem(null);
+                };
+
+                const sysShare = () => {
                     if (navigator.share) {
-                        navigator.share({
-                            title: 'AI Generator',
-                            text: `Посмотри на это: ${prompt}`,
-                            url: url
-                        }).then(() => setShareModalItem(null)).catch(console.error);
+                        navigator.share({ title: 'AI Bot', text: prompt, url: url }).catch(console.error);
                     } else {
-                        window.Telegram.WebApp.showAlert("Ваш браузер не поддерживает системный шеринг.");
+                        window.Telegram.WebApp.showAlert("Используйте копирование ссылки");
                     }
                 };
 
@@ -768,9 +771,12 @@
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <h3 className="text-xl font-bold text-white mb-4">Поделиться</h3>
                             <button onClick={nativeShare} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
-                                <i className="fas fa-paper-plane mr-2"></i> Отправить...
+                                <i className="fas fa-paper-plane mr-2"></i> Переслать в Telegram
                             </button>
-                            <button onClick={copyLink} className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
+                             <button onClick={sysShare} className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
+                                <i className="fas fa-share-alt mr-2"></i> Системный шаринг
+                            </button>
+                            <button onClick={copyLink} className="w-full bg-gray-800 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center border border-gray-600">
                                 <i className="fas fa-link mr-2"></i> Скопировать ссылку
                             </button>
                             <button onClick={() => setShareModalItem(null)} className="w-full text-gray-400 py-2">Закрыть</button>
@@ -803,6 +809,7 @@
 
                     {payModalData && <PayModal />}
                     {shareModalItem && <ShareModal />}
+                    {fullscreenItem && <FullScreenModal />}
                 </div>
             );
         };
