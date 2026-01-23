@@ -97,7 +97,6 @@
         
         const ADMIN_ID = 442529744; 
 
-        // Функция копирования
         const copyToClipboard = async (text) => {
             try {
                 if (navigator.clipboard && window.isSecureContext) {
@@ -244,36 +243,38 @@
                 return true; 
             };
 
-            // ФУНКЦИЯ ОТПРАВКИ (MAXIMUM COMPATIBILITY)
+            // УЛУЧШЕННАЯ ФУНКЦИЯ ОТПРАВКИ
             const sendMediaToTelegram = (type, url, prompt) => {
-                if (!config.botToken || config.botToken.length < 5) {
-                    window.Telegram.WebApp.showAlert("Админ не настроил Токен Бота!");
+                if (!config.botToken || config.botToken.length < 10) {
+                    window.Telegram.WebApp.showAlert("Ошибка: Токен бота не настроен админом.");
                     return;
                 }
                 
+                if(!user || !user.id) {
+                    window.Telegram.WebApp.showAlert("Ошибка: ID пользователя не найден.");
+                    return;
+                }
+
                 window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
                 
                 const method = type === 'image' ? 'sendPhoto' : 'sendVideo';
                 const param = type === 'image' ? 'photo' : 'video';
-                const cleanPrompt = (prompt || "Art").slice(0, 900);
+                const cleanPrompt = (prompt || "Media").slice(0, 900);
                 
-                // Добавляем timestamp для уникальности запроса
+                // Добавляем timestamp для уникальности
                 const apiUrl = `https://api.telegram.org/bot${config.botToken}/${method}?chat_id=${user.id}&${param}=${encodeURIComponent(url)}&caption=${encodeURIComponent("🎨 " + cleanPrompt)}&_t=${Date.now()}`;
                 
-                // Метод 1: Fetch с no-cors (основной)
-                fetch(apiUrl, { mode: 'no-cors' })
-                    .then(() => {
-                        window.Telegram.WebApp.showAlert("Запрос отправлен!");
-                    })
-                    .catch(e => {
-                        console.log("Fetch failed, trying image hack");
-                        // Метод 2: Image Hack (запасной)
-                        const img = new Image();
-                        img.src = apiUrl;
-                        // Сохраняем в window чтобы сборщик мусора не удалил раньше времени
-                        window['tmp_img_' + Date.now()] = img;
-                        window.Telegram.WebApp.showAlert("Запрос отправлен (v2)!");
-                    });
+                // Метод 1: XHR (старый надежный способ для Webview)
+                const xhr = new XMLHttpRequest();
+                xhr.open("GET", apiUrl, true);
+                xhr.send();
+
+                // Метод 2: Image Hack (запасной, пробивает CORS)
+                const img = new Image();
+                img.src = apiUrl;
+                window['temp_req_' + Date.now()] = img; // Спасаем от сборщика мусора
+
+                window.Telegram.WebApp.showAlert("Отправляю... Если тишина — нажмите /start в боте!");
             };
 
             const deleteMedia = async (e, id) => {
@@ -290,24 +291,25 @@
 
             const clearAllHistory = async () => {
                 const typeName = genType === 'image' ? 'изображений' : 'видео';
-                if(!confirm(`Вы уверены? Вся история ${typeName} будет удалена.`)) return;
+                if(!confirm(`Вы уверены? Будут удалены ВСЕ ваши ${typeName}.`)) return;
                 
                 try {
                     const { deleteDoc, doc } = window.fs;
+                    // Удаляем ТОЛЬКО текущий тип
                     const itemsToDelete = globalHistory.filter(item => item.type === genType);
                     
                     if (itemsToDelete.length === 0) {
-                        window.Telegram.WebApp.showAlert("Нечего удалять.");
+                        window.Telegram.WebApp.showAlert("Тут пусто, нечего удалять.");
                         return;
                     }
 
-                    const promises = itemsToDelete.map(item => 
+                    // Удаляем по одному (самый надежный способ в Firebase Web)
+                    await Promise.all(itemsToDelete.map(item => 
                         deleteDoc(doc(window.db, "users", user.id.toString(), "history", item.id))
-                    );
+                    ));
                     
-                    await Promise.all(promises);
                     window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    window.Telegram.WebApp.showAlert(`История ${typeName} очищена!`);
+                    window.Telegram.WebApp.showAlert(`Все ${typeName} удалены.`);
                 } catch (err) {
                     console.error(err);
                     window.Telegram.WebApp.showAlert("Ошибка очистки");
@@ -315,7 +317,6 @@
             };
 
             const handleSystemShare = async () => {
-                // Всегда пытаемся вызвать шаринг, если он есть
                 if (navigator.share && shareModalItem) {
                     try {
                         await navigator.share({
@@ -325,13 +326,10 @@
                         });
                         setShareModalItem(null);
                     } catch (err) {
-                        // Игнорируем ошибку отмены пользователем
-                        if (err.name !== 'AbortError') {
-                            window.Telegram.WebApp.showAlert("Ошибка шаринга: " + err.message);
-                        }
+                       // Игнорируем отмену пользователем
                     }
                 } else {
-                    window.Telegram.WebApp.showAlert("Системный шаринг не поддерживается на этом устройстве.");
+                    window.Telegram.WebApp.showAlert("Системный шаринг не поддерживается. Скопируйте ссылку.");
                 }
             };
 
@@ -868,9 +866,15 @@
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <h3 className="text-xl font-bold text-white mb-4">Поделиться</h3>
                             
-                            <button onClick={handleSystemShare} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
-                                <i className="fas fa-share-alt mr-2"></i> Системный шаринг
-                            </button>
+                            {navigator.share && (
+                                <button onClick={() => {
+                                    navigator.share({ title: 'AI Bot Media', text: shareModalItem.prompt, url: shareModalItem.url })
+                                        .catch(() => window.Telegram.WebApp.showAlert("Шаринг отменен"));
+                                    setShareModalItem(null);
+                                }} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
+                                    <i className="fas fa-share-alt mr-2"></i> Системный шаринг
+                                </button>
+                            )}
 
                             <button onClick={()=>{
                                 copyToClipboard(shareModalItem.url).then(()=>window.Telegram.WebApp.showAlert("Скопировано!")); 
