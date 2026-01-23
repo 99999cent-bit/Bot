@@ -97,6 +97,7 @@
         const { useState, useEffect, useRef, useMemo } = React;
         
         const ADMIN_ID = 442529744; 
+        const BASE_URL = "https://99999cent-bit.github.io/Bot/"; // Ваша ссылка
 
         const copyToClipboard = async (text) => {
             try {
@@ -155,38 +156,33 @@
                         tg.expand();
                         tg.enableClosingConfirmation();
 
-                        // 1. Попытка получить данные из Telegram WebApp
+                        // Логика определения пользователя
                         let telegramUser = tg.initDataUnsafe?.user;
 
-                        // 2. Если не в Телеграм, ищем параметры в URL (для браузера)
-                        // Пример ссылки: https://ваш-сайт.com/?uid=12345&first_name=Alex
+                        // Если открыто НЕ в Телеграме (в обычном браузере)
                         if (!telegramUser) {
                             const urlParams = new URLSearchParams(window.location.search);
-                            const uid = urlParams.get('uid');
+                            const uid = urlParams.get('uid'); // Можно передать ?uid=...
                             const firstName = urlParams.get('first_name');
                             
                             if (uid) {
                                 telegramUser = { 
-                                    id: parseInt(uid), 
+                                    id: uid, 
                                     first_name: firstName || 'Пользователь', 
                                     username: 'web_user' 
                                 };
+                            } else {
+                                // Если ID нет в ссылке, создаем/берем Гостевой ID из памяти браузера
+                                let guestId = localStorage.getItem('ai_bot_guest_id');
+                                if (!guestId) {
+                                    guestId = 'guest_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+                                    localStorage.setItem('ai_bot_guest_id', guestId);
+                                }
+                                telegramUser = { id: guestId, first_name: 'Гость', username: 'guest' };
                             }
-                        }
-
-                        // 3. Fallback на Админа (для тестов, если ничего нет)
-                        if (!telegramUser) {
-                            // Раскомментировать для локальной разработки:
-                            // telegramUser = { id: ADMIN_ID, first_name: 'Admin', username: 'admin' };
                         }
                         
                         if (!window.firebaseReady) await new Promise(r => document.addEventListener('firebase-ready', r));
-
-                        if (!telegramUser) {
-                            alert("Ошибка доступа. Откройте приложение через ссылку в боте.");
-                            setIsLoading(false);
-                            return;
-                        }
 
                         const { doc, getDoc, setDoc, updateDoc, onSnapshot, increment, collection } = window.fs;
                         const db = window.db;
@@ -202,7 +198,6 @@
 
                         if (!userSnap.exists()) {
                             const urlParams = new URLSearchParams(window.location.search);
-                            // Получаем start_param из Telegram или из URL браузера
                             const startParam = tg.initDataUnsafe?.start_param || urlParams.get('start'); 
                             
                             await setDoc(userRef, {
@@ -246,7 +241,7 @@
 
                     } catch (e) {
                         console.error("Init Error:", e);
-                        alert("Ошибка инициализации: " + e.message);
+                        window.Telegram.WebApp.showAlert("Ошибка инициализации: " + e.message);
                     } finally {
                         setIsLoading(false);
                     }
@@ -275,40 +270,29 @@
                 return true; 
             };
 
-            // ФУНКЦИЯ СКАЧИВАНИЯ (Прямое скачивание в браузере)
             const handleDownload = async (url) => {
-                if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                     window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
-                }
-                
+                if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
                 try {
-                    // Пытаемся скачать файл напрямую
                     const response = await fetch(url);
                     const blob = await response.blob();
                     const blobUrl = window.URL.createObjectURL(blob);
                     
                     const link = document.createElement('a');
                     link.href = blobUrl;
-                    // Генерируем имя файла
-                    const ext = genType === 'image' ? 'png' : 'mp4';
-                    link.download = `ai_media_${Date.now()}.${ext}`;
+                    link.download = `ai_media_${Date.now()}.${genType === 'image' ? 'png' : 'mp4'}`;
                     document.body.appendChild(link);
                     link.click();
                     
                     document.body.removeChild(link);
                     window.URL.revokeObjectURL(blobUrl);
                     
-                    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    }
+                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 } catch (e) {
                     console.error("Download fail:", e);
-                    // Фоллбек: просто открываем ссылку
-                    window.open(url, '_blank');
+                    window.Telegram.WebApp.openLink(url, { try_instant_view: false });
                 }
             };
 
-            // Обработчики долгого нажатия для ИЗОБРАЖЕНИЙ
             const handleTouchStart = (item) => {
                 if (item.type === 'video') return; 
                 longPressTimer.current = setTimeout(() => {
@@ -329,9 +313,9 @@
                 try {
                     const { deleteDoc, doc } = window.fs;
                     await deleteDoc(doc(window.db, "users", user.id.toString(), "history", id));
-                    if(window.Telegram.WebApp.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 } catch (err) {
-                    alert("Ошибка удаления");
+                    window.Telegram.WebApp.showAlert("Ошибка удаления");
                 }
             };
 
@@ -344,7 +328,7 @@
                     const itemsToDelete = globalHistory.filter(item => item.type === genType);
                     
                     if (itemsToDelete.length === 0) {
-                        alert("В этой вкладке нечего удалять.");
+                        window.Telegram.WebApp.showAlert("В этой вкладке нечего удалять.");
                         return;
                     }
 
@@ -352,11 +336,11 @@
                         deleteDoc(doc(window.db, "users", user.id.toString(), "history", item.id))
                     ));
                     
-                    if(window.Telegram.WebApp.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    alert(`Все ${typeName} удалены.`);
+                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    window.Telegram.WebApp.showAlert(`Все ${typeName} удалены.`);
                 } catch (err) {
                     console.error(err);
-                    alert("Ошибка очистки");
+                    window.Telegram.WebApp.showAlert("Ошибка очистки");
                 }
             };
 
@@ -371,7 +355,7 @@
                         setShareModalItem(null);
                     } catch (err) { }
                 } else {
-                    alert("Системный шаринг не поддерживается. Скопируйте ссылку.");
+                    window.Telegram.WebApp.showAlert("Системный шаринг не поддерживается. Скопируйте ссылку.");
                 }
             };
 
@@ -399,7 +383,7 @@
                         
                         setIsProc(false);
                         setPrompt('');
-                        if(window.Telegram.WebApp.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                        if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                     }, 2000);
                 };
 
@@ -544,7 +528,7 @@
                         addDoc(collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
                             role: 'ai', text: "Ответ на: " + text, createdAt: serverTimestamp()
                         });
-                        if(window.Telegram.WebApp.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                        if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                     }, 1000);
                 };
 
@@ -591,7 +575,8 @@
 
             const TabProfile = () => {
                 const [buyV, setBuyV] = useState(100);
-                const link = `https://t.me/Ai_Generator75_Bot?start=${user?.id}`;
+                // ИСПОЛЬЗУЕМ НОВУЮ БАЗОВУЮ ССЫЛКУ
+                const link = `${BASE_URL}?start=${user?.id}`;
 
                 const handleBuy = (amt, price, name) => {
                     setPayModalData({ name: name || 'Пополнение', tokens: amt, price: price || Math.ceil(amt * config.tokenPriceRub) });
