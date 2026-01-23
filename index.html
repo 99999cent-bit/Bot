@@ -97,7 +97,7 @@
         const { useState, useEffect, useRef, useMemo } = React;
         
         const ADMIN_ID = 442529744; 
-        const BASE_URL = "https://99999cent-bit.github.io/Bot/"; // Ваша ссылка
+        const BASE_URL = "https://99999cent-bit.github.io/Bot/"; 
 
         const copyToClipboard = async (text) => {
             try {
@@ -156,13 +156,11 @@
                         tg.expand();
                         tg.enableClosingConfirmation();
 
-                        // Логика определения пользователя
                         let telegramUser = tg.initDataUnsafe?.user;
 
-                        // Если открыто НЕ в Телеграме (в обычном браузере)
                         if (!telegramUser) {
                             const urlParams = new URLSearchParams(window.location.search);
-                            const uid = urlParams.get('uid'); // Можно передать ?uid=...
+                            const uid = urlParams.get('uid'); 
                             const firstName = urlParams.get('first_name');
                             
                             if (uid) {
@@ -172,7 +170,6 @@
                                     username: 'web_user' 
                                 };
                             } else {
-                                // Если ID нет в ссылке, создаем/берем Гостевой ID из памяти браузера
                                 let guestId = localStorage.getItem('ai_bot_guest_id');
                                 if (!guestId) {
                                     guestId = 'guest_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
@@ -270,6 +267,7 @@
                 return true; 
             };
 
+            // ФУНКЦИЯ СКАЧИВАНИЯ
             const handleDownload = async (url) => {
                 if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
                 try {
@@ -279,16 +277,22 @@
                     
                     const link = document.createElement('a');
                     link.href = blobUrl;
-                    link.download = `ai_media_${Date.now()}.${genType === 'image' ? 'png' : 'mp4'}`;
+                    const ext = genType === 'image' ? 'png' : 'mp4';
+                    link.download = `ai_media_${Date.now()}.${ext}`;
                     document.body.appendChild(link);
                     link.click();
                     
-                    document.body.removeChild(link);
-                    window.URL.revokeObjectURL(blobUrl);
+                    // Увеличиваем задержку, чтобы мобильный браузер успел подхватить
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(blobUrl);
+                    }, 500);
                     
                     if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 } catch (e) {
                     console.error("Download fail:", e);
+                    // Если Blob не сработал (например, внутри Telegram Webview),
+                    // пробуем открыть системный браузер
                     window.Telegram.WebApp.openLink(url, { try_instant_view: false });
                 }
             };
@@ -305,6 +309,13 @@
                     clearTimeout(longPressTimer.current);
                     longPressTimer.current = null;
                 }
+            };
+
+            // Кнопка для выхода в системный браузер
+            const openInBrowser = () => {
+                // Добавляем ID пользователя к ссылке, чтобы не потерять аккаунт
+                const url = `${BASE_URL}?uid=${user.id}&first_name=${encodeURIComponent(user.first_name)}`;
+                window.Telegram.WebApp.openLink(url);
             };
 
             const deleteMedia = async (e, id) => {
@@ -575,7 +586,6 @@
 
             const TabProfile = () => {
                 const [buyV, setBuyV] = useState(100);
-                // ИСПОЛЬЗУЕМ НОВУЮ БАЗОВУЮ ССЫЛКУ
                 const link = `${BASE_URL}?start=${user?.id}`;
 
                 const handleBuy = (amt, price, name) => {
@@ -596,6 +606,12 @@
                                 <div><h2 className="text-2xl font-bold text-white">{user.first_name}</h2><p className="text-gray-400 text-sm">ID: {user.id}</p></div>
                                 <div className="text-right"><span className="block text-4xl font-bold text-yellow-400">{user.id===ADMIN_ID ? '∞' : dbUser.balance}</span><span className="text-xs text-gray-400 uppercase">Токенов</span></div>
                             </div>
+                            
+                            {/* Кнопка выхода в браузер */}
+                            <button onClick={openInBrowser} className="w-full bg-blue-900/50 py-2 rounded-xl text-sm border border-blue-800 text-blue-300 mb-2 font-bold flex items-center justify-center gap-2">
+                                <i className="fas fa-globe"></i> 🌐 Открыть в браузере (для скачивания)
+                            </button>
+
                             {user.id === ADMIN_ID && <button onClick={() => setActiveTab('admin')} className="w-full bg-gray-700 py-2 rounded-xl text-sm border border-gray-600 text-white">Админка</button>}
                         </div>
 
