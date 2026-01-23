@@ -22,7 +22,7 @@
             margin: 0;
             padding-bottom: 80px;
             -webkit-tap-highlight-color: transparent;
-            user-select: none; /* Чтобы текст не выделялся при долгом нажатии */
+            user-select: none;
         }
         
         .hide-scrollbar::-webkit-scrollbar { display: none; }
@@ -145,7 +145,6 @@
                 ]
             });
 
-            // Таймер для долгого нажатия
             const longPressTimer = useRef(null);
 
             useEffect(() => {
@@ -247,48 +246,35 @@
                 return true; 
             };
 
-            // ОТПРАВКА В TELEGRAM (ВСЕ МЕТОДЫ СРАЗУ)
-            const sendMediaToTelegram = (type, url, prompt) => {
-                if (!config.botToken || config.botToken.length < 10) {
-                    window.Telegram.WebApp.showAlert("Ошибка: Токен бота не настроен админом.");
-                    return;
-                }
-                
-                if(!user || !user.id) {
-                    window.Telegram.WebApp.showAlert("Ошибка: ID пользователя не найден.");
-                    return;
-                }
-
+            const handleDownload = async (url) => {
                 window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
-                
-                const method = type === 'image' ? 'sendPhoto' : 'sendVideo';
-                const param = type === 'image' ? 'photo' : 'video';
-                const cleanPrompt = (prompt || "Media").slice(0, 900);
-                
-                const apiUrl = `https://api.telegram.org/bot${config.botToken}/${method}?chat_id=${user.id}&${param}=${encodeURIComponent(url)}&caption=${encodeURIComponent("🎨 " + cleanPrompt)}&_t=${Date.now()}`;
-                
-                // 1. SendBeacon
-                const beaconSuccess = navigator.sendBeacon ? navigator.sendBeacon(apiUrl) : false;
-
-                // 2. Image Hack (GET)
-                const img = new Image();
-                img.src = apiUrl;
-                window['temp_req_' + Date.now()] = img;
-
-                // 3. Fetch (GET, no-cors)
-                if (!beaconSuccess) {
-                    fetch(apiUrl, { mode: 'no-cors' }).catch(() => {}); 
+                try {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    link.download = `ai_media_${Date.now()}.${genType === 'image' ? 'png' : 'mp4'}`;
+                    document.body.appendChild(link);
+                    link.click();
+                    
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(blobUrl);
+                    
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                } catch (e) {
+                    console.error("Download fail:", e);
+                    window.Telegram.WebApp.openLink(url, { try_instant_view: false });
                 }
-
-                window.Telegram.WebApp.showAlert("Загрузка... Файл отправлен в чат!");
             };
 
-            // Обработчики долгого нажатия
+            // Обработчики долгого нажатия для ИЗОБРАЖЕНИЙ (видео обрабатываются плеером)
             const handleTouchStart = (item) => {
+                if (item.type === 'video') return; // Видео не трогаем, там нативные контролы
                 longPressTimer.current = setTimeout(() => {
-                    sendMediaToTelegram(item.type, item.url, item.prompt);
-                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                }, 800); // 800мс удержание
+                    handleDownload(item.url);
+                }, 600); 
             };
 
             const handleTouchEnd = () => {
@@ -419,24 +405,25 @@
                                         <span className="text-[10px] text-gray-500">{item.date}</span>
                                     </div>
                                     
-                                    {/* Контейнер медиа с обработчиками долгого нажатия */}
-                                    <div 
-                                        className="bg-black flex justify-center items-center min-h-[200px]" 
-                                        onClick={() => setFullscreenItem(item)}
-                                        onTouchStart={() => handleTouchStart(item)}
-                                        onTouchEnd={handleTouchEnd}
-                                        onTouchMove={handleTouchEnd} /* Отмена при скролле */
-                                        onContextMenu={(e) => e.preventDefault()} /* Блокировка стандартного меню */
-                                    >
+                                    <div className="bg-black flex justify-center items-center min-h-[200px]">
                                         {item.type === 'image' ? (
-                                            <img src={item.url} className="max-w-full max-h-[400px] object-contain pointer-events-none" alt="Gen" />
+                                            <div 
+                                                onClick={() => setFullscreenItem(item)}
+                                                onTouchStart={() => handleTouchStart(item)}
+                                                onTouchEnd={handleTouchEnd}
+                                                onTouchMove={handleTouchEnd}
+                                                onContextMenu={(e) => e.preventDefault()}
+                                            >
+                                                <img src={item.url} className="max-w-full max-h-[400px] object-contain" alt="Gen" />
+                                            </div>
                                         ) : (
-                                            <video src={item.url} controls className="max-w-full max-h-[400px]" />
+                                            /* Вернул стандартный плеер для видео */
+                                            <video src={item.url} controls playsInline className="max-w-full max-h-[400px]" />
                                         )}
                                     </div>
                                     <div className="media-actions">
-                                        <button onClick={() => sendMediaToTelegram(item.type, item.url, item.prompt)} className="media-btn border-r border-[#2b3c4e]">
-                                            <i className="fas fa-file-download mr-2"></i> Загрузить
+                                        <button onClick={() => handleDownload(item.url)} className="media-btn border-r border-[#2b3c4e]">
+                                            <i className="fas fa-download mr-2"></i> Скачать
                                         </button>
                                         <button onClick={() => setShareModalItem(item)} className="media-btn">
                                             <i className="fas fa-share-nodes mr-2"></i> Поделиться
