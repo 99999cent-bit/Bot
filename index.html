@@ -97,6 +97,7 @@
         
         const ADMIN_ID = 442529744; 
 
+        // Функция копирования
         const copyToClipboard = async (text) => {
             try {
                 if (navigator.clipboard && window.isSecureContext) {
@@ -243,7 +244,7 @@
                 return true; 
             };
 
-            // УЛУЧШЕННАЯ ФУНКЦИЯ ОТПРАВКИ
+            // МАКСИМАЛЬНО НАДЕЖНАЯ ФУНКЦИЯ ОТПРАВКИ
             const sendMediaToTelegram = (type, url, prompt) => {
                 if (!config.botToken || config.botToken.length < 10) {
                     window.Telegram.WebApp.showAlert("Ошибка: Токен бота не настроен админом.");
@@ -264,17 +265,22 @@
                 // Добавляем timestamp для уникальности
                 const apiUrl = `https://api.telegram.org/bot${config.botToken}/${method}?chat_id=${user.id}&${param}=${encodeURIComponent(url)}&caption=${encodeURIComponent("🎨 " + cleanPrompt)}&_t=${Date.now()}`;
                 
-                // Метод 1: XHR (старый надежный способ для Webview)
-                const xhr = new XMLHttpRequest();
-                xhr.open("GET", apiUrl, true);
-                xhr.send();
+                // --- МЕТОД 1: SendBeacon (наиболее надежен для "fire and forget") ---
+                // Работает даже если страница закрывается, отправляет POST
+                const beaconSuccess = navigator.sendBeacon ? navigator.sendBeacon(apiUrl) : false;
 
-                // Метод 2: Image Hack (запасной, пробивает CORS)
+                // --- МЕТОД 2: Image Hack (обход CORS GET запросом) ---
+                // Это срабатывает практически всегда, так как браузеры разрешают грузить картинки с любых доменов
                 const img = new Image();
                 img.src = apiUrl;
                 window['temp_req_' + Date.now()] = img; // Спасаем от сборщика мусора
 
-                window.Telegram.WebApp.showAlert("Отправляю... Если тишина — нажмите /start в боте!");
+                // --- МЕТОД 3: Fetch (на всякий случай) ---
+                if (!beaconSuccess) {
+                    fetch(apiUrl, { mode: 'no-cors' }).catch(() => {}); 
+                }
+
+                window.Telegram.WebApp.showAlert("Запрос отправлен! Проверьте чат с ботом.");
             };
 
             const deleteMedia = async (e, id) => {
@@ -291,15 +297,15 @@
 
             const clearAllHistory = async () => {
                 const typeName = genType === 'image' ? 'изображений' : 'видео';
-                if(!confirm(`Вы уверены? Будут удалены ВСЕ ваши ${typeName}.`)) return;
+                if(!confirm(`Вы уверены? Будут удалены ВСЕ ваши ${typeName} из этой вкладки.`)) return;
                 
                 try {
                     const { deleteDoc, doc } = window.fs;
-                    // Удаляем ТОЛЬКО текущий тип
+                    // Удаляем ТОЛЬКО текущий тип (genType)
                     const itemsToDelete = globalHistory.filter(item => item.type === genType);
                     
                     if (itemsToDelete.length === 0) {
-                        window.Telegram.WebApp.showAlert("Тут пусто, нечего удалять.");
+                        window.Telegram.WebApp.showAlert("В этой вкладке нечего удалять.");
                         return;
                     }
 
@@ -317,7 +323,8 @@
             };
 
             const handleSystemShare = async () => {
-                if (navigator.share && shareModalItem) {
+                // Пытаемся вызвать шаринг
+                if (navigator.share) {
                     try {
                         await navigator.share({
                             title: 'AI Bot Media',
@@ -326,10 +333,11 @@
                         });
                         setShareModalItem(null);
                     } catch (err) {
-                       // Игнорируем отмену пользователем
+                        // Игнорируем ошибку отмены пользователем
                     }
                 } else {
-                    window.Telegram.WebApp.showAlert("Системный шаринг не поддерживается. Скопируйте ссылку.");
+                    // Если браузер не поддерживает, говорим об этом
+                    window.Telegram.WebApp.showAlert("Системный шаринг недоступен на этом устройстве. Используйте копирование ссылки.");
                 }
             };
 
@@ -866,15 +874,9 @@
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <h3 className="text-xl font-bold text-white mb-4">Поделиться</h3>
                             
-                            {navigator.share && (
-                                <button onClick={() => {
-                                    navigator.share({ title: 'AI Bot Media', text: shareModalItem.prompt, url: shareModalItem.url })
-                                        .catch(() => window.Telegram.WebApp.showAlert("Шаринг отменен"));
-                                    setShareModalItem(null);
-                                }} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
-                                    <i className="fas fa-share-alt mr-2"></i> Системный шаринг
-                                </button>
-                            )}
+                            <button onClick={handleSystemShare} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
+                                <i className="fas fa-share-alt mr-2"></i> Системный шаринг
+                            </button>
 
                             <button onClick={()=>{
                                 copyToClipboard(shareModalItem.url).then(()=>window.Telegram.WebApp.showAlert("Скопировано!")); 
