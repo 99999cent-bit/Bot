@@ -97,6 +97,7 @@
         
         const ADMIN_ID = 442529744; 
 
+        // Функция копирования
         const copyToClipboard = async (text) => {
             try {
                 if (navigator.clipboard && window.isSecureContext) {
@@ -243,9 +244,7 @@
                 return true; 
             };
 
-            // ФУНКЦИЯ ОТПРАВКИ (IMAGE HACK)
-            // Обходит CORS, так как загрузка картинок разрешена с любого домена
-            const sendMediaToTelegram = (type, url, prompt) => {
+            const sendMediaToTelegram = async (type, url, prompt) => {
                 if (!config.botToken) {
                     window.Telegram.WebApp.showAlert("Токен бота не настроен в админке!");
                     return;
@@ -256,14 +255,23 @@
                 const method = type === 'image' ? 'sendPhoto' : 'sendVideo';
                 const param = type === 'image' ? 'photo' : 'video';
                 
-                // Формируем URL для GET запроса
-                const apiUrl = `https://api.telegram.org/bot${config.botToken}/${method}?chat_id=${user.id}&${param}=${encodeURIComponent(url)}&caption=${encodeURIComponent("🎨 " + prompt)}`;
+                // Обрезаем caption до 1000 символов, чтобы не было ошибки API
+                const cleanPrompt = (prompt || "Media").substring(0, 900); 
                 
-                // Создаем "невидимую" картинку. Браузер попытается её загрузить, тем самым выполнив GET запрос на сервер Telegram.
-                // Telegram выполнит действие (отправит сообщение), даже если браузер потом скажет, что это "плохая картинка".
-                new Image().src = apiUrl;
+                const apiUrl = `https://api.telegram.org/bot${config.botToken}/${method}?chat_id=${user.id}&${param}=${encodeURIComponent(url)}&caption=${encodeURIComponent("🎨 " + cleanPrompt)}`;
                 
-                window.Telegram.WebApp.showAlert("Запрос отправлен! Если бот молчит — проверьте, что вы нажали /start в чате с ним.");
+                try {
+                    // Используем fetch с mode: 'no-cors'. Это "opaque" запрос.
+                    // Мы не узнаем статус (успех/ошибка), но браузер разрешит отправку.
+                    await fetch(apiUrl, { 
+                        mode: 'no-cors',
+                        method: 'GET'
+                    });
+                    window.Telegram.WebApp.showAlert("Отправлено! Проверьте чат с ботом.");
+                } catch (e) {
+                    console.error("Fetch failed", e);
+                    window.Telegram.WebApp.showAlert("Ошибка отправки. Попробуйте скопировать ссылку.");
+                }
             };
 
             const deleteMedia = async (e, id) => {
@@ -284,7 +292,6 @@
                 
                 try {
                     const { deleteDoc, doc } = window.fs;
-                    // Фильтруем только текущий тип медиа
                     const itemsToDelete = globalHistory.filter(item => item.type === genType);
                     
                     if (itemsToDelete.length === 0) {
@@ -292,7 +299,6 @@
                         return;
                     }
 
-                    // Удаляем каждый документ по отдельности
                     const promises = itemsToDelete.map(item => 
                         deleteDoc(doc(window.db, "users", user.id.toString(), "history", item.id))
                     );
@@ -303,6 +309,24 @@
                 } catch (err) {
                     console.error(err);
                     window.Telegram.WebApp.showAlert("Ошибка очистки");
+                }
+            };
+
+            const handleSystemShare = async () => {
+                try {
+                    if (navigator.share && shareModalItem) {
+                        await navigator.share({
+                            title: 'AI Bot Media',
+                            text: shareModalItem.prompt,
+                            url: shareModalItem.url
+                        });
+                        setShareModalItem(null);
+                    } else {
+                        throw new Error("Not supported");
+                    }
+                } catch (err) {
+                    console.log("Share failed", err);
+                    window.Telegram.WebApp.showAlert("Системный шаринг не поддерживается или отменен.");
                 }
             };
 
@@ -404,7 +428,6 @@
                 const [loadL, setLoadL] = useState(true);
                 const endRef = useRef(null);
 
-                // Загрузка списка чатов
                 useEffect(() => {
                     if (!user) return;
                     const { collection, onSnapshot } = window.fs;
@@ -416,7 +439,6 @@
                     });
                 }, [user]);
 
-                // Загрузка сообщений
                 useEffect(() => {
                     if (!chatId || !user) { setMsgs([]); return; }
                     const { collection, onSnapshot } = window.fs;
@@ -841,14 +863,9 @@
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <h3 className="text-xl font-bold text-white mb-4">Поделиться</h3>
                             
-                            {navigator.share && (
-                                <button onClick={() => {
-                                    navigator.share({ title: 'AI Bot', text: shareModalItem.prompt, url: shareModalItem.url }).catch(console.error);
-                                    setShareModalItem(null);
-                                }} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
-                                    <i className="fas fa-share-alt mr-2"></i> Системный шаринг
-                                </button>
-                            )}
+                            <button onClick={handleSystemShare} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
+                                <i className="fas fa-share-alt mr-2"></i> Системный шаринг
+                            </button>
 
                             <button onClick={()=>{
                                 copyToClipboard(shareModalItem.url).then(()=>window.Telegram.WebApp.showAlert("Скопировано!")); 
