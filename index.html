@@ -97,7 +97,6 @@
         const { useState, useEffect, useRef, useMemo } = React;
         
         const ADMIN_ID = 442529744; 
-        const BASE_URL = "https://99999cent-bit.github.io/Bot/"; 
 
         const copyToClipboard = async (text) => {
             try {
@@ -146,6 +145,7 @@
                 ]
             });
 
+            // Таймер для долгого нажатия
             const longPressTimer = useRef(null);
 
             useEffect(() => {
@@ -157,27 +157,7 @@
                         tg.enableClosingConfirmation();
 
                         let telegramUser = tg.initDataUnsafe?.user;
-
-                        if (!telegramUser) {
-                            const urlParams = new URLSearchParams(window.location.search);
-                            const uid = urlParams.get('uid'); 
-                            const firstName = urlParams.get('first_name');
-                            
-                            if (uid) {
-                                telegramUser = { 
-                                    id: uid, 
-                                    first_name: firstName || 'Пользователь', 
-                                    username: 'web_user' 
-                                };
-                            } else {
-                                let guestId = localStorage.getItem('ai_bot_guest_id');
-                                if (!guestId) {
-                                    guestId = 'guest_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
-                                    localStorage.setItem('ai_bot_guest_id', guestId);
-                                }
-                                telegramUser = { id: guestId, first_name: 'Гость', username: 'guest' };
-                            }
-                        }
+                        if (!telegramUser) telegramUser = { id: ADMIN_ID, first_name: 'Admin', username: 'admin' };
                         
                         if (!window.firebaseReady) await new Promise(r => document.addEventListener('firebase-ready', r));
 
@@ -267,38 +247,16 @@
                 return true; 
             };
 
-            // ФУНКЦИЯ СКАЧИВАНИЯ
-            const handleDownload = async (url) => {
-                if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
-                try {
-                    const response = await fetch(url);
-                    const blob = await response.blob();
-                    const blobUrl = window.URL.createObjectURL(blob);
-                    
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    const ext = genType === 'image' ? 'png' : 'mp4';
-                    link.download = `ai_media_${Date.now()}.${ext}`;
-                    document.body.appendChild(link);
-                    link.click();
-                    
-                    // Увеличиваем задержку, чтобы мобильный браузер успел подхватить
-                    setTimeout(() => {
-                        document.body.removeChild(link);
-                        window.URL.revokeObjectURL(blobUrl);
-                    }, 500);
-                    
-                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                } catch (e) {
-                    console.error("Download fail:", e);
-                    // Если Blob не сработал (например, внутри Telegram Webview),
-                    // пробуем открыть системный браузер
-                    window.Telegram.WebApp.openLink(url, { try_instant_view: false });
-                }
+            // ФУНКЦИЯ "СКАЧАТЬ" - ТЕПЕРЬ ПРОСТО ОТКРЫВАЕТ В БРАУЗЕРЕ
+            const handleDownload = (url) => {
+                window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
+                // Открываем ссылку во внешнем браузере
+                window.Telegram.WebApp.openLink(url, { try_instant_view: false });
             };
 
+            // Обработчики долгого нажатия для ИЗОБРАЖЕНИЙ (видео обрабатываются плеером)
             const handleTouchStart = (item) => {
-                if (item.type === 'video') return; 
+                if (item.type === 'video') return; // Видео не трогаем, там нативные контролы
                 longPressTimer.current = setTimeout(() => {
                     handleDownload(item.url);
                 }, 600); 
@@ -311,20 +269,13 @@
                 }
             };
 
-            // Кнопка для выхода в системный браузер
-            const openInBrowser = () => {
-                // Добавляем ID пользователя к ссылке, чтобы не потерять аккаунт
-                const url = `${BASE_URL}?uid=${user.id}&first_name=${encodeURIComponent(user.first_name)}`;
-                window.Telegram.WebApp.openLink(url);
-            };
-
             const deleteMedia = async (e, id) => {
                 e.stopPropagation();
                 if(!confirm("Удалить этот файл навсегда?")) return;
                 try {
                     const { deleteDoc, doc } = window.fs;
                     await deleteDoc(doc(window.db, "users", user.id.toString(), "history", id));
-                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 } catch (err) {
                     window.Telegram.WebApp.showAlert("Ошибка удаления");
                 }
@@ -347,7 +298,7 @@
                         deleteDoc(doc(window.db, "users", user.id.toString(), "history", item.id))
                     ));
                     
-                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                     window.Telegram.WebApp.showAlert(`Все ${typeName} удалены.`);
                 } catch (err) {
                     console.error(err);
@@ -394,7 +345,7 @@
                         
                         setIsProc(false);
                         setPrompt('');
-                        if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                     }, 2000);
                 };
 
@@ -539,7 +490,7 @@
                         addDoc(collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
                             role: 'ai', text: "Ответ на: " + text, createdAt: serverTimestamp()
                         });
-                        if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                     }, 1000);
                 };
 
@@ -586,7 +537,7 @@
 
             const TabProfile = () => {
                 const [buyV, setBuyV] = useState(100);
-                const link = `${BASE_URL}?start=${user?.id}`;
+                const link = `https://t.me/Ai_Generator75_Bot?start=${user?.id}`;
 
                 const handleBuy = (amt, price, name) => {
                     setPayModalData({ name: name || 'Пополнение', tokens: amt, price: price || Math.ceil(amt * config.tokenPriceRub) });
@@ -606,12 +557,6 @@
                                 <div><h2 className="text-2xl font-bold text-white">{user.first_name}</h2><p className="text-gray-400 text-sm">ID: {user.id}</p></div>
                                 <div className="text-right"><span className="block text-4xl font-bold text-yellow-400">{user.id===ADMIN_ID ? '∞' : dbUser.balance}</span><span className="text-xs text-gray-400 uppercase">Токенов</span></div>
                             </div>
-                            
-                            {/* Кнопка выхода в браузер */}
-                            <button onClick={openInBrowser} className="w-full bg-blue-900/50 py-2 rounded-xl text-sm border border-blue-800 text-blue-300 mb-2 font-bold flex items-center justify-center gap-2">
-                                <i className="fas fa-globe"></i> 🌐 Открыть в браузере (для скачивания)
-                            </button>
-
                             {user.id === ADMIN_ID && <button onClick={() => setActiveTab('admin')} className="w-full bg-gray-700 py-2 rounded-xl text-sm border border-gray-600 text-white">Админка</button>}
                         </div>
 
