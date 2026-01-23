@@ -45,7 +45,7 @@
         .tariff-card { background: linear-gradient(145deg, #2b3c4e, #1c2936); border: 1px solid #334e68; transition: transform 0.1s; position: relative; overflow: hidden; }
         .tariff-card:active { transform: scale(0.98); }
 
-        .media-card { background: #1c2936; border-radius: 16px; overflow: hidden; margin-top: 16px; border: 1px solid #2b3c4e; }
+        .media-card { background: #1c2936; border-radius: 16px; overflow: hidden; margin-top: 16px; border: 1px solid #2b3c4e; position: relative; }
         .media-actions { display: flex; border-top: 1px solid #2b3c4e; }
         .media-btn { flex: 1; padding: 12px; text-align: center; color: #3390ec; font-weight: bold; font-size: 14px; background: rgba(255,255,255,0.02); }
         .media-btn:active { background: rgba(255,255,255,0.05); }
@@ -54,6 +54,9 @@
         
         .chat-item { background: #233040; border-radius: 12px; padding: 12px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
         .chat-item:active { transform: scale(0.98); background: #2b3c4e; }
+        
+        .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: #ff4d4d; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: transform 0.2s; }
+        .delete-btn:active { transform: scale(0.9); background: rgba(255,0,0,0.2); }
     </style>
 </head>
 <body>
@@ -63,7 +66,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
         import { 
-            getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion, collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc
+            getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion, collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc, writeBatch
         } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -83,7 +86,7 @@
         window.db = db;
         window.fs = { 
             doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion, 
-            collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc 
+            collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc, writeBatch 
         };
         window.firebaseReady = true;
         document.dispatchEvent(new Event('firebase-ready'));
@@ -248,7 +251,7 @@
 
             const sendMediaToTelegram = async (type, url, prompt) => {
                 if (!config.botToken) {
-                    window.Telegram.WebApp.showAlert("Токен бота не настроен в админке!");
+                    window.Telegram.WebApp.showAlert("Бот не настроен! (Нет токена)");
                     return;
                 }
                 
@@ -256,14 +259,47 @@
                 
                 const method = type === 'image' ? 'sendPhoto' : 'sendVideo';
                 const param = type === 'image' ? 'photo' : 'video';
+                
+                // Используем mode: 'no-cors' для обхода CORS в WebView, 
+                // но результат будет "opaque" (непрозрачным), то есть мы не узнаем статус.
+                // Но запрос уйдет.
                 const apiUrl = `https://api.telegram.org/bot${config.botToken}/${method}?chat_id=${user.id}&${param}=${encodeURIComponent(url)}&caption=${encodeURIComponent("🎨 " + prompt)}`;
                 
                 try { 
-                    await fetch(apiUrl); 
-                    window.Telegram.WebApp.showAlert("Отправлено в чат с ботом!");
+                    await fetch(apiUrl, { mode: 'no-cors' });
+                    // В no-cors мы не знаем статус, поэтому просто говорим "Отправлено"
+                    window.Telegram.WebApp.showAlert("Запрос отправлен боту!");
                 } catch (e) { 
-                    console.log("Send fail", e);
-                    window.Telegram.WebApp.showAlert("Ошибка отправки. Проверьте, запустили ли вы бота.");
+                    console.error("Send error", e);
+                    window.Telegram.WebApp.showAlert("Не удалось отправить. Попробуйте скопировать ссылку.");
+                }
+            };
+
+            const deleteMedia = async (e, id) => {
+                e.stopPropagation();
+                if(!confirm("Удалить этот файл навсегда?")) return;
+                try {
+                    const { deleteDoc, doc } = window.fs;
+                    await deleteDoc(doc(window.db, "users", user.id.toString(), "history", id));
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                } catch (err) {
+                    window.Telegram.WebApp.showAlert("Ошибка удаления");
+                }
+            };
+
+            const clearAllHistory = async () => {
+                if(!confirm("Вы уверены? Вся история изображений и видео будет удалена безвозвратно.")) return;
+                try {
+                    const { deleteDoc, doc } = window.fs;
+                    // Удаляем по одному из текущего списка (Batch сложнее в одном файле без лишних импортов, цикл надежнее здесь)
+                    const promises = globalHistory.map(item => 
+                        deleteDoc(doc(window.db, "users", user.id.toString(), "history", item.id))
+                    );
+                    await Promise.all(promises);
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    window.Telegram.WebApp.showAlert("История очищена!");
+                } catch (err) {
+                    window.Telegram.WebApp.showAlert("Ошибка очистки");
                 }
             };
 
@@ -289,13 +325,9 @@
                             createdAt: serverTimestamp() 
                         });
                         
-                        // АВТОМАТИЧЕСКАЯ ОТПРАВКА ОТКЛЮЧЕНА ПО ПРОСЬБЕ
-                        // sendMediaToTelegram(genType, newUrl, prompt);
-                        
                         setIsProc(false);
                         setPrompt('');
                         window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                        // if(config.botToken) window.Telegram.WebApp.showAlert("Готово! Отправлено ботом.");
                     }, 2000);
                 };
 
@@ -304,7 +336,7 @@
                 return (
                     <div className="page-enter p-5 pb-24">
                         <div className="flex justify-between mb-4">
-                            <span className="text-gray-400">Баланс: <b className="text-yellow-400">{user.id === ADMIN_ID ? '∞' : dbUser.balance}</b></span>
+                            <span className="text-gray-400">Баланс: <b className="text-yellow-400">{user.id === ADMIN_ID ? '∞ (Admin)' : dbUser.balance}</b></span>
                         </div>
                         <div className="flex bg-gray-800 rounded-lg p-1 mb-4">
                             <button onClick={() => setGenType('image')} className={`flex-1 py-2 rounded font-bold text-sm ${genType === 'image' ? 'bg-blue-600' : 'text-gray-500'}`}>Изображение ({config.priceImage})</button>
@@ -315,17 +347,44 @@
                             {isProc ? <i className="fas fa-spinner fa-spin"></i> : "🚀 Сгенерировать"}
                         </button>
                         <div className="mt-6 space-y-4">
+                            <div className="flex justify-between items-center pl-1">
+                                <h3 className="text-gray-400 text-sm font-bold">Ваши {genType === 'image' ? 'изображения' : 'видео'}:</h3>
+                                {list.length > 0 && (
+                                    <button onClick={clearAllHistory} className="text-red-400 text-xs font-bold border border-red-900 bg-red-900/20 px-2 py-1 rounded hover:bg-red-900/40">
+                                        <i className="fas fa-trash-alt mr-1"></i> Очистить всё
+                                    </button>
+                                )}
+                            </div>
+                            
+                            {list.length === 0 && globalHistory.length > 0 && (
+                                <div className="text-center text-gray-500 text-sm py-4 bg-gray-800/50 rounded-xl">
+                                    Пусто. Посмотрите другую вкладку.
+                                </div>
+                            )}
+                            
                             {list.map(item => (
                                 <div key={item.id} className="media-card slide-down">
-                                    <div className="p-3 bg-[#233040] flex justify-between"><span className="text-xs text-gray-400 truncate max-w-[70%]">{item.prompt}</span></div>
+                                    <div className="delete-btn" onClick={(e) => deleteMedia(e, item.id)}>
+                                        <i className="fas fa-times"></i>
+                                    </div>
+                                    <div className="p-3 bg-[#233040] border-b border-[#2b3c4e] flex justify-between items-center pr-10">
+                                        <span className="text-xs text-gray-400 truncate max-w-[90%]">{item.prompt}</span>
+                                        <span className="text-[10px] text-gray-500">{item.date}</span>
+                                    </div>
                                     <div className="bg-black flex justify-center items-center min-h-[200px]" onClick={() => setFullscreenItem(item)}>
-                                        {item.type === 'image' ? <img src={item.url} className="max-w-full max-h-[300px]" /> : <video src={item.url} controls className="max-w-full max-h-[300px]" />}
+                                        {item.type === 'image' ? (
+                                            <img src={item.url} className="max-w-full max-h-[400px] object-contain" alt="Gen" />
+                                        ) : (
+                                            <video src={item.url} controls className="max-w-full max-h-[400px]" />
+                                        )}
                                     </div>
                                     <div className="media-actions">
                                         <button onClick={() => sendMediaToTelegram(item.type, item.url, item.prompt)} className="media-btn border-r border-[#2b3c4e]">
                                             <i className="fas fa-paper-plane mr-2"></i> Отправить мне
                                         </button>
-                                        <button onClick={() => setShareModalItem(item)} className="media-btn">Поделиться</button>
+                                        <button onClick={() => setShareModalItem(item)} className="media-btn">
+                                            <i className="fas fa-share-nodes mr-2"></i> Поделиться
+                                        </button>
                                     </div>
                                 </div>
                             ))}
@@ -779,16 +838,14 @@
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
                             <h3 className="text-xl font-bold text-white mb-4">Поделиться</h3>
                             
-                            <button onClick={() => {
-                                if (navigator.share) {
+                            {navigator.share && (
+                                <button onClick={() => {
                                     navigator.share({ title: 'AI Bot', text: shareModalItem.prompt, url: shareModalItem.url }).catch(console.error);
-                                } else {
-                                    window.Telegram.WebApp.showAlert("Системный шаринг недоступен");
-                                }
-                                setShareModalItem(null);
-                            }} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
-                                <i className="fas fa-share-alt mr-2"></i> Системный шаринг
-                            </button>
+                                    setShareModalItem(null);
+                                }} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
+                                    <i className="fas fa-share-alt mr-2"></i> Системный шаринг
+                                </button>
+                            )}
 
                             <button onClick={()=>{
                                 copyToClipboard(shareModalItem.url).then(()=>window.Telegram.WebApp.showAlert("Скопировано!")); 
@@ -813,6 +870,5 @@
     </script>
 </body>
 </html>
-
 
 
