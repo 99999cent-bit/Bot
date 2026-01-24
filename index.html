@@ -40,8 +40,8 @@
         .slide-down { animation: slideDown 0.4s ease-out; }
         @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; backdrop-filter: blur(5px); }
-        .modal-content { background: #1c2936; padding: 20px; border-radius: 20px; width: 90%; max-width: 350px; text-align: center; border: 1px solid #3390ec; position: relative; max-height: 90vh; display: flex; flex-direction: column; }
+        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 40px; backdrop-filter: blur(5px); overflow-y: auto; }
+        .modal-content { background: #1c2936; padding: 20px; border-radius: 20px; width: 90%; max-width: 350px; text-align: center; border: 1px solid #3390ec; position: relative; margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; }
         
         .fullscreen-media { max-width: 100%; max-height: 80vh; object-fit: contain; }
         .close-fs-btn { position: absolute; top: 20px; right: 20px; color: white; font-size: 30px; background: rgba(0,0,0,0.5); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 101; cursor: pointer; }
@@ -65,18 +65,16 @@
         .tab-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; border-radius: 8px; transition: all 0.2s; color: #8a9aa9; }
         .tab-btn.active { background: #3390ec; color: white; }
 
-        .custom-checkbox { width: 20px; height: 20px; border: 2px solid #555; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .custom-checkbox { width: 20px; height: 20px; border: 2px solid #555; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; cursor: pointer; }
         .custom-checkbox.checked { background: #3390ec; border-color: #3390ec; }
         .custom-checkbox i { font-size: 12px; color: white; display: none; }
         .custom-checkbox.checked i { display: block; }
         
         .msg-badge { background: #e05353; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
-
-        /* Статусы в админке */
         .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-        .status-green { background: #22c55e; box-shadow: 0 0 5px #22c55e; } /* Онлайн */
-        .status-yellow { background: #eab308; } /* Не был 4 дня */
-        .status-gray { background: #6b7280; } /* Обычный */
+        .status-green { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
+        .status-yellow { background: #eab308; }
+        .status-gray { background: #6b7280; }
     </style>
 </head>
 <body>
@@ -156,8 +154,6 @@
             const [supportModalOpen, setSupportModalOpen] = useState(false); 
             
             const [historyModalUser, setHistoryModalUser] = useState(null);
-            const [grantModalUser, setGrantModalUser] = useState(null);
-            const [modalGrantAmount, setModalGrantAmount] = useState('');
             const [unreadSupportCount, setUnreadSupportCount] = useState(0);
 
             const [config, setConfig] = useState({
@@ -186,8 +182,10 @@
                         tg.enableClosingConfirmation();
 
                         let telegramUser = tg.initDataUnsafe?.user;
+                        
+                        // СТРОГАЯ ПРОВЕРКА TELEGRAM (если раскомментировать нижнюю строку, будет работать только в ТГ)
                         if (!telegramUser) {
-                             // telegramUser = { id: ADMIN_ID, first_name: 'Admin', username: 'admin' }; // DEBUG
+                             // telegramUser = { id: ADMIN_ID, first_name: 'Admin', username: 'admin' }; // DEBUG ONLY
                              if (!telegramUser) {
                                 document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:white;text-align:center;background:#17212b;">Пожалуйста, откройте приложение через Telegram бот.</div>';
                                 return;
@@ -215,7 +213,6 @@
                         const userRef = doc(db, "users", telegramUser.id.toString());
                         const userSnap = await getDoc(userRef);
 
-                        // Обновляем "Онлайн" статус
                         const updateOnline = () => updateDoc(userRef, { lastActiveAt: serverTimestamp() }).catch(()=>{});
 
                         if (!userSnap.exists()) {
@@ -230,6 +227,7 @@
                                 lastActiveAt: serverTimestamp()
                             });
                             logTransaction(telegramUser.id.toString(), 'bonus', currentWelcomeBonus, 0, 'Регистрация');
+
                             if (startParam && startParam != telegramUser.id) {
                                 const refUserRef = doc(db, "users", startParam.toString());
                                 const refSnap = await getDoc(refUserRef);
@@ -370,7 +368,6 @@
                 const messagesEndRef = useRef(null);
 
                 useEffect(() => {
-                    // Ищем открытый тикет
                     const q = window.fs.query(
                         window.fs.collection(window.db, "support_tickets"),
                         window.fs.where("userId", "==", user.id),
@@ -380,9 +377,9 @@
                     const unsub = window.fs.onSnapshot(q, (snap) => {
                         if (!snap.empty) {
                             setTicket({ id: snap.docs[0].id, ...snap.docs[0].data() });
-                            setView("menu"); // Если есть тикет, сначала меню
+                            setView("menu");
                         } else {
-                            setView("chat"); // Если нет, сразу чат (создание нового)
+                            setView("chat");
                             setTicket(null);
                         }
                     });
@@ -391,7 +388,6 @@
 
                 useEffect(() => {
                     if (ticket && view === "chat") {
-                        // Подписка на сообщения тикета
                         const q = window.fs.query(
                             window.fs.collection(window.db, "support_tickets", ticket.id, "messages"),
                             window.fs.orderBy("createdAt", "asc")
@@ -410,7 +406,6 @@
                     let currentTicketId = ticket?.id;
 
                     if (!currentTicketId) {
-                        // Создаем новый тикет
                         const ref = await window.fs.addDoc(window.fs.collection(window.db, "support_tickets"), {
                             userId: user.id,
                             userName: user.first_name,
@@ -421,7 +416,6 @@
                         });
                         currentTicketId = ref.id;
                     } else {
-                         // Обновляем статус
                          window.fs.updateDoc(window.fs.doc(window.db, "support_tickets", currentTicketId), {
                             updatedAt: window.fs.serverTimestamp(),
                             hasUnreadAdmin: true
@@ -441,11 +435,9 @@
                          await window.fs.updateDoc(window.fs.doc(window.db, "support_tickets", ticket.id), { status: "closed" });
                          setTicket(null);
                          setMsgs([]);
-                         setView("chat"); // Переход к созданию нового
+                         setView("chat"); 
                      }
                 };
-
-                const continueChat = () => setView("chat");
 
                 if (!supportModalOpen) return null;
 
@@ -460,7 +452,7 @@
                             {view === "menu" && (
                                 <div className="flex-1 flex flex-col justify-center items-center p-6 space-y-4">
                                     <p className="text-gray-300 text-center mb-4">У вас есть открытое обращение.</p>
-                                    <button onClick={continueChat} className="w-full bg-blue-600 py-3 rounded-xl font-bold text-white">Продолжить переписку</button>
+                                    <button onClick={()=>setView("chat")} className="w-full bg-blue-600 py-3 rounded-xl font-bold text-white">Продолжить переписку</button>
                                     <button onClick={closeTicket} className="w-full bg-gray-700 py-3 rounded-xl text-white">Создать новый запрос</button>
                                 </div>
                             )}
@@ -507,7 +499,6 @@
                             window.fs.collection(window.db, "support_tickets", activeTicket.id, "messages"),
                             window.fs.orderBy("createdAt", "asc")
                         );
-                        // Сброс флага непрочитанных при открытии
                         window.fs.updateDoc(window.fs.doc(window.db, "support_tickets", activeTicket.id), { hasUnreadAdmin: false });
                         
                         return window.fs.onSnapshot(q, (snap) => {
@@ -527,7 +518,6 @@
                     batch.set(window.fs.doc(window.fs.collection(window.db, "support_tickets", activeTicket.id, "messages")), {
                         sender: "admin", text: input, createdAt: window.fs.serverTimestamp()
                     });
-                    // Уведомление юзеру (Тип support, чтобы без подарка)
                     batch.update(window.fs.doc(window.db, "users", activeTicket.userId.toString()), {
                         notification: { type: 'support', text: `Ответ поддержки: ${input}` }
                     });
@@ -577,7 +567,256 @@
                 );
             };
 
-            // --- TABS ---
+            const HistoryModal = () => {
+                if (!historyModalUser) return null;
+                const [txs, setTxs] = useState([]);
+                const [hTab, setHTab] = useState('spent'); 
+                useEffect(() => {
+                    const q = window.fs.query(window.fs.collection(window.db, "users", historyModalUser.id.toString(), "transactions"), window.fs.orderBy('createdAt', 'desc'));
+                    return window.fs.onSnapshot(q, (snap) => setTxs(snap.docs.map(d => ({id:d.id, ...d.data()}))));
+                }, [historyModalUser]);
+                const filtered = txs.filter(t => {
+                    if (hTab === 'spent') return t.type === 'spend';
+                    if (hTab === 'bonus') return t.type === 'bonus';
+                    if (hTab === 'purchase') return t.type === 'purchase';
+                    return true;
+                });
+                return (
+                    <div className="modal-overlay" onClick={() => setHistoryModalUser(null)}>
+                        <div className="modal-content w-full h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                            <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><h3 className="font-bold text-white text-lg">{historyModalUser.firstName}</h3><button onClick={() => setHistoryModalUser(null)} className="text-gray-400"><i className="fas fa-times"></i></button></div>
+                            <div className="flex bg-gray-900 rounded-lg p-1 mb-4 shrink-0"><button onClick={()=>setHTab('spent')} className={`tab-btn ${hTab==='spent'?'active':''}`}>Потрачено</button><button onClick={()=>setHTab('bonus')} className={`tab-btn ${hTab==='bonus'?'active':''}`}>Бонусы</button><button onClick={()=>setHTab('purchase')} className={`tab-btn ${hTab==='purchase'?'active':''}`}>Куплено</button></div>
+                            <div className="flex-1 overflow-y-auto text-left space-y-2">
+                                {filtered.length === 0 && <div className="text-gray-500 text-center text-sm mt-4">Пусто</div>}
+                                {filtered.map(t => (
+                                    <div key={t.id} className="bg-gray-800 p-3 rounded-xl border border-gray-700 text-sm">
+                                        <div className="flex justify-between mb-1"><span className="text-white font-bold">{t.description || 'Операция'}</span><span className={`font-mono ${t.type==='spend'?'text-red-400':'text-green-400'}`}>{t.type==='spend'?'-':'+'}{t.amount} т.</span></div>
+                                        <div className="flex justify-between text-xs text-gray-500"><span>{t.dateStr}</span>{t.amountRub > 0 && <span className="text-yellow-500">{t.amountRub} ₽</span>}</div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            // --- MAIN TABS ---
+            const TabGenerate = () => {
+                const [prompt, setPrompt] = useState('');
+                const [isProc, setIsProc] = useState(false);
+                const go = async () => {
+                    if (!prompt) return;
+                    if (!(await handleSpend(genType === 'image' ? config.priceImage : config.priceVideo, `Генерация ${genType}`))) return;
+                    setIsProc(true);
+                    setTimeout(async () => {
+                        const newUrl = genType === 'image' ? `https://placehold.co/600x600/1a1a1a/FFF.png?text=${encodeURIComponent(prompt)}` : "https://www.w3schools.com/html/mov_bbb.mp4";
+                        await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "history"), {
+                            type: genType, url: newUrl, prompt: prompt, date: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: window.fs.serverTimestamp()
+                        });
+                        setIsProc(false); setPrompt(''); window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    }, 2000);
+                };
+                const list = globalHistory.filter(item => item.type === genType);
+                return (
+                    <div className="page-enter p-5 pb-24">
+                        <div className="flex justify-between mb-4"><span className="text-gray-400">Баланс: <b className="text-yellow-400">{user.id === ADMIN_ID ? '∞' : dbUser.balance}</b></span></div>
+                        <div className="flex bg-gray-800 rounded-lg p-1 mb-4"><button onClick={() => setGenType('image')} className={`flex-1 py-2 rounded font-bold text-sm ${genType === 'image' ? 'bg-blue-600' : 'text-gray-500'}`}>Изображение ({config.priceImage})</button><button onClick={() => setGenType('video')} className={`flex-1 py-2 rounded font-bold text-sm ${genType === 'video' ? 'bg-purple-600' : 'text-gray-500'}`}>Видео ({config.priceVideo})</button></div>
+                        <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={`Опиши ${genType}...`} className="w-full bg-gray-800 rounded-xl p-4 mb-4 text-white min-h-[100px] border border-gray-700 outline-none"></textarea>
+                        <button onClick={go} disabled={isProc} className={`w-full py-3 rounded-xl font-bold ${genType === 'image' ? 'bg-blue-600' : 'bg-purple-600'}`}>{isProc ? <i className="fas fa-spinner fa-spin"></i> : "🚀 Сгенерировать"}</button>
+                        <div className="mt-6 space-y-4">
+                            <div className="flex justify-between items-center pl-1 mb-2"><h3 className="text-gray-400 text-sm font-bold">История:</h3>{list.length > 0 && <button onClick={clearAllHistory} className="text-red-400 text-xs font-bold bg-red-900/20 px-3 py-1 rounded">Очистить всё</button>}</div>
+                            {list.length === 0 && <div className="text-center text-gray-500 text-sm py-4">Пусто</div>}
+                            {list.map(item => (
+                                <div key={item.id} className="media-card slide-down">
+                                    <div className="delete-btn" onClick={(e) => deleteMedia(e, item.id)}><i className="fas fa-times"></i></div>
+                                    <div className="p-3 bg-[#233040] border-b border-[#2b3c4e] flex justify-between"><span className="text-xs text-gray-400 truncate">{item.prompt}</span><span className="text-[10px] text-gray-500">{item.date}</span></div>
+                                    <div className="bg-black flex justify-center items-center min-h-[200px] relative" 
+                                         onTouchStart={() => handleTouchStart(item)} onTouchEnd={handleTouchEnd} onContextMenu={e => e.preventDefault()} onClick={() => setFullscreenItem(item)}>
+                                        {item.type === 'image' ? <img src={item.url} className="max-w-full max-h-[400px]" /> : <><video src={item.url} controls className="max-w-full max-h-[400px]" /><div className="play-overlay"><i className="fas fa-play-circle"></i></div></>}
+                                    </div>
+                                    <div className="media-actions">
+                                        <button onClick={(e) => { handleDownload(e, item.url); setFullscreenItem(item); }} className="media-btn border-r border-[#2b3c4e]"><i className="fas fa-expand mr-2"></i> Скачать</button>
+                                        <button onClick={() => setShareModalItem(item)} className="media-btn"><i className="fas fa-share-nodes mr-2"></i> Поделиться</button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                );
+            };
+
+            const TabChat = () => {
+                const [chatId, setChatId] = useState(null);
+                const [chatList, setChatList] = useState([]);
+                const [msgs, setMsgs] = useState([]);
+                const [txt, setTxt] = useState('');
+                const endRef = useRef(null);
+
+                // Загрузка чатов
+                useEffect(() => {
+                    if (!user) return;
+                    const q = window.fs.query(
+                        window.fs.collection(window.db, "users", user.id.toString(), "chats"),
+                        window.fs.orderBy('createdAt', 'desc')
+                    );
+                    return window.fs.onSnapshot(q, (snap) => {
+                        setChatList(snap.docs.map(d => ({id:d.id, ...d.data()})));
+                    });
+                }, [user]);
+
+                // Загрузка сообщений
+                useEffect(() => {
+                    if (!chatId || !user) return;
+                    const q = window.fs.query(
+                        window.fs.collection(window.db, "users", user.id.toString(), "chats", chatId, "messages"),
+                        window.fs.orderBy('createdAt', 'asc')
+                    );
+                    return window.fs.onSnapshot(q, (snap) => {
+                        setMsgs(snap.docs.map(d => d.data()));
+                        setTimeout(() => endRef.current?.scrollIntoView({behavior:"smooth"}), 100);
+                    });
+                }, [chatId, user]);
+
+                const createChat = async () => {
+                    const ref = await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats"), {
+                        title: "Новый чат", createdAt: window.fs.serverTimestamp()
+                    });
+                    setChatId(ref.id);
+                };
+
+                const deleteChat = async (e, id) => {
+                    e.stopPropagation();
+                    if(!confirm("Удалить?")) return;
+                    await window.fs.deleteDoc(window.fs.doc(window.db, "users", user.id.toString(), "chats", id));
+                    if(chatId === id) setChatId(null);
+                };
+
+                const send = async () => {
+                    if (!txt.trim()) return;
+                    if (!(await handleSpend(config.priceText, 'Чат с ботом'))) return;
+                    
+                    let cid = chatId;
+                    if (!cid) { // Если чата нет, создаем на лету
+                        const ref = await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats"), {
+                            title: txt.slice(0, 20) + "...", createdAt: window.fs.serverTimestamp()
+                        });
+                        cid = ref.id;
+                        setChatId(cid);
+                    }
+
+                    await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
+                        role: 'user', text: txt, createdAt: window.fs.serverTimestamp()
+                    });
+                    
+                    const userMsg = txt;
+                    setTxt('');
+
+                    // Имитация ответа
+                    setTimeout(() => {
+                        window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
+                            role: 'ai', text: "Ответ на: " + userMsg, createdAt: window.fs.serverTimestamp()
+                        });
+                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    }, 1000);
+                };
+
+                if (!chatId) {
+                    return (
+                        <div className="page-enter p-4 pb-24">
+                            <button onClick={createChat} className="w-full py-4 rounded-xl bg-blue-600 font-bold text-white shadow-lg mb-6 flex items-center justify-center gap-2 active:scale-95 transition">
+                                <i className="fas fa-plus"></i> Новый чат
+                            </button>
+                            <h3 className="text-gray-400 text-sm font-bold mb-3 pl-1">Ваши диалоги:</h3>
+                            {chatList.length === 0 && <div className="text-center text-gray-500 mt-10">Нет диалогов</div>}
+                            <div className="space-y-2">
+                                {chatList.map(c => (
+                                    <div key={c.id} onClick={() => setChatId(c.id)} className="chat-item flex justify-between items-center group">
+                                        <div className="truncate text-white text-sm font-medium pl-2">{c.title}</div>
+                                        <button onClick={(e) => deleteChat(e, c.id)} className="p-2 text-gray-500"><i className="fas fa-trash"></i></button>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    );
+                }
+
+                return (
+                    <div className="page-enter flex flex-col h-screen fixed inset-0 z-50 bg-[#17212b]">
+                        <div className="h-[60px] bg-[#1c2936] flex items-center px-4 border-b border-gray-800 shrink-0">
+                             <button onClick={() => setChatId(null)} className="text-blue-500 font-medium flex gap-2"><i className="fas fa-chevron-left"></i> Назад</button>
+                        </div>
+                         <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-[80px]">
+                            {msgs.map((m,i) => <div key={i} className={`message-bubble ${m.role==='user'?'user-msg ml-auto':'ai-msg'}`}>{m.text}</div>)}
+                            <div ref={endRef} />
+                        </div>
+                        <div className="chat-input-area flex items-center gap-2 pb-safe bg-[#17212b] border-t border-gray-800">
+                            <input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Сообщение..." className="flex-1 bg-gray-800 text-white rounded-full px-4 py-3 border border-gray-600 outline-none focus:border-blue-500"/>
+                            <button onClick={send} className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg"><i className="fas fa-paper-plane"></i></button>
+                        </div>
+                    </div>
+                );
+            };
+
+            const TabProfile = () => {
+                const [buyV, setBuyV] = useState(100);
+                const baseUrl = config.referralBaseUrl || DEFAULT_BASE_URL;
+                const link = `${baseUrl}?start=${user?.id}`;
+
+                const handleBuy = (amt, price, name) => setPayModalData({ name, tokens: amt, price });
+                
+                const copyLink = () => {
+                    navigator.clipboard.writeText(link);
+                    window.Telegram.WebApp.showAlert("Скопировано!");
+                };
+
+                if (!user) return <div className="p-10 text-center text-white">Загрузка...</div>;
+
+                return (
+                    <div className="page-enter p-5 pb-24">
+                        <div className="bg-gray-800 rounded-2xl p-6 mb-4 border border-gray-700 cursor-pointer" onClick={() => setHistoryModalUser(user)}>
+                            <div className="flex justify-between items-start mb-2">
+                                <div><h2 className="text-2xl font-bold text-white">{user.first_name}</h2><p className="text-gray-400 text-sm">ID: {user.id}</p></div>
+                                <div className="text-right">
+                                    <span className="block text-4xl font-bold text-yellow-400">{user.id===ADMIN_ID ? '∞' : dbUser.balance}</span>
+                                    <span className="text-xs text-gray-400 uppercase">Токенов (нажми)</span>
+                                </div>
+                            </div>
+                            <div className="flex gap-2 mt-2">
+                                {user.id === ADMIN_ID && <button onClick={(e) => {e.stopPropagation(); setActiveTab('admin');}} className="flex-1 bg-gray-700 py-2 rounded-xl text-sm border border-gray-600 text-white">Админка</button>}
+                                <button onClick={(e) => {e.stopPropagation(); setSupportModalOpen(true);}} className="flex-1 bg-blue-900/50 py-2 rounded-xl text-sm border border-blue-800 text-blue-300">🆘 Поддержка</button>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
+                            <h3 className="font-bold text-lg mb-2 text-white">🎁 Пригласи друга</h3>
+                            <p className="text-sm text-gray-300 mb-4">Награда: {config.referralReward} т.</p>
+                            <button onClick={copyLink} className="bg-blue-600 px-4 py-3 rounded-lg font-bold text-sm text-white w-full mb-3">Скопировать ссылку</button>
+                            <div className="bg-black/40 p-3 rounded-lg overflow-hidden text-center"><p className="text-xs text-gray-400 truncate">{link}</p></div>
+                        </div>
+
+                        <div className="grid gap-3 mb-6">
+                            {(config.tariffs || []).map(t => (
+                                <div key={t.id} onClick={() => handleBuy(t.tokens, t.price, t.name)} className="tariff-card rounded-xl p-4 flex justify-between items-center">
+                                    <div className="flex items-center">
+                                        <div className="bg-blue-600/20 text-blue-400 w-10 h-10 rounded-full flex items-center justify-center mr-3"><i className="fas fa-bolt"></i></div>
+                                        <div><div className="font-bold text-base text-white">{t.name}</div><div className="text-gray-400 text-xs">{t.tokens} т.</div></div>
+                                    </div>
+                                    <div className="bg-blue-600 px-3 py-1.5 rounded-lg font-bold text-sm text-white">{t.price} ₽</div>
+                                </div>
+                            ))}
+                        </div>
+
+                         <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
+                            <h3 className="font-bold text-lg mb-3 text-white">Свой вариант</h3>
+                            <div className="mb-4 flex items-center bg-gray-900 rounded-xl border border-gray-600 overflow-hidden">
+                                <input type="number" value={buyV} onChange={e => setBuyV(Number(e.target.value))} className="flex-1 bg-transparent p-3 text-white outline-none"/>
+                                <span className="pr-4 text-gray-500 text-sm">шт.</span>
+                            </div>
+                            <button onClick={() => handleBuy(buyV, Math.ceil(buyV * config.tokenPriceRub), 'Пополнение')} className="w-full bg-green-600 py-3 rounded-xl font-bold text-white">Купить за {Math.ceil(buyV * config.tokenPriceRub)} ₽</button>
+                        </div>
+                    </div>
+                );
+            };
 
             const TabAdmin = () => {
                 const [sub, setSub] = useState('set'); 
@@ -593,7 +832,7 @@
                 const [gAmount, setGAmount] = useState('');
                 const [singleTarget, setSingleTarget] = useState(null);
                 const [adminSupportOpen, setAdminSupportOpen] = useState(false);
-                const [statusFilter, setStatusFilter] = useState('all'); // all, online, inactive
+                const [statusFilter, setStatusFilter] = useState('all');
 
                 const upd = (k, v) => setLc(p => ({...p, [k]: v}));
                 const save = () => saveConfigToDb(lc);
@@ -631,10 +870,9 @@
                             const userRef = window.fs.doc(window.db, "users", u.id);
                             const txRef = window.fs.doc(window.fs.collection(window.db, "users", u.id, "transactions"));
                             
-                            // Уведомление ТИП ПОДАРОК
                             batch.update(userRef, { 
                                 balance: window.fs.increment(amount),
-                                notification: { type: 'gift', text: `Вам начислено ${amount} бонусов!` }
+                                notification: { type: 'gift', text: `🎁 Вам начислено ${amount} бонусов!` } 
                             });
                             batch.set(txRef, {
                                 type: 'bonus', amount: amount, amountRub: 0, description: 'Подарок админа',
@@ -672,13 +910,15 @@
                         // Фильтр даты
                         let includeDate = true;
                         if (filterPeriod === 'today') includeDate = regDate.toDateString() === now.toDateString();
-                        else if (filterPeriod === 'week') includeDate = regDate >= new Date(now.getTime() - 7*86400000);
+                        else if (filterPeriod === 'week') includeDate = regDate >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
                         else if (filterPeriod === 'manual' && customStart && customEnd) {
                             includeDate = regDate >= new Date(customStart) && regDate <= new Date(customEnd + 'T23:59:59');
                         }
 
                         if (includeDate) {
-                            u++; so+=(x.balance||0); r+=(x.totalDonated||0);
+                            u++; 
+                            so += (x.balance || 0); 
+                            r += (x.totalDonated || 0);
                             
                             // Фильтр поиска и статуса
                             const matchesSearch = !searchQuery || x.firstName?.toLowerCase().includes(q) || d.id.includes(q);
@@ -741,55 +981,22 @@
                                         </div>
                                         {selectedUsers.size > 0 && <button onClick={() => setGrantModal(true)} className="text-xs bg-pink-600 px-3 py-1 rounded text-white font-bold">Подарить ({selectedUsers.size})</button>}
                                     </div>
-                                    <div className="flex gap-2 mb-2">
-                                        <input placeholder="Поиск..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 bg-gray-900 rounded p-2 text-white border border-gray-700 text-xs"/>
-                                        <button onClick={toggleAll} className="bg-gray-700 px-3 rounded text-xs text-white">Все</button>
-                                    </div>
-                                    <div className="bg-gray-900 rounded-lg overflow-y-auto max-h-80 border border-gray-700">
-                                        {userResults.map(u => (
-                                            <div key={u.id} className="p-2 border-b border-gray-800 flex items-center gap-2 hover:bg-gray-800">
-                                                <div className={`custom-checkbox ${selectedUsers.has(u.id)?'checked':''}`} onClick={() => toggleUser(u.id)}><i className="fas fa-check"></i></div>
-                                                <div className="flex-1 min-w-0" onClick={() => {setSingleTarget(u); setGrantModal(true);}}>
-                                                    <div className="flex items-center">
-                                                        <span className={`status-dot ${u.isOnline?'status-green':(u.isInactive?'status-yellow':'status-gray')}`}></span>
-                                                        <div className="text-white text-xs font-bold truncate">{u.firstName}</div>
-                                                    </div>
-                                                    <div className="text-gray-500 text-[10px] truncate">{u.id}</div>
-                                                </div>
-                                                <span className="text-yellow-500 text-xs">{u.balance}</span>
-                                                <button onClick={() => setHistoryModalUser(u)} className="text-blue-400 p-2"><i className="fas fa-book"></i></button>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    <div className="flex gap-2 mb-2"><input placeholder="Поиск..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 bg-gray-900 rounded p-2 text-white border border-gray-700 text-xs"/><button onClick={toggleAll} className="bg-gray-700 px-3 rounded text-xs text-white">Все</button></div>
+                                    <div className="bg-gray-900 rounded-lg overflow-y-auto max-h-80 border border-gray-700">{userResults.map(u => (<div key={u.id} className="p-2 border-b border-gray-800 flex items-center gap-2 hover:bg-gray-800"><div className={`custom-checkbox ${selectedUsers.has(u.id)?'checked':''}`} onClick={() => toggleUser(u.id)}><i className="fas fa-check"></i></div><div className="flex-1 min-w-0" onClick={() => {setSingleTarget(u); setGrantModal(true);}}><div className="flex items-center"><span className={`status-dot ${u.isOnline?'status-green':(u.isInactive?'status-yellow':'status-gray')}`}></span><div className="text-white text-xs font-bold truncate">{u.firstName}</div></div><div className="text-gray-500 text-[10px] truncate">{u.id}</div></div><span className="text-yellow-500 text-xs">{u.balance}</span><button onClick={() => setHistoryModalUser(u)} className="text-blue-400 p-2"><i className="fas fa-book"></i></button></div>))}</div>
                                 </div>
                             </div>
                         )}
-
-                        {grantModal && (
-                            <div className="modal-overlay" onClick={() => {setGrantModal(false); setSingleTarget(null);}}>
-                                <div className="modal-content" onClick={e => e.stopPropagation()}>
-                                    <h3 className="text-lg font-bold text-white mb-2">{singleTarget ? `Бонус для ${singleTarget.firstName}` : `Рассылка для ${selectedUsers.size} чел.`}</h3>
-                                    <input type="number" placeholder="Сумма токенов" value={gAmount} onChange={e => setGAmount(e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-600 mb-4"/>
-                                    <button onClick={executeGrant} className="w-full bg-green-600 py-2 rounded text-white font-bold mb-2">Начислить</button>
-                                    <button onClick={() => {setGrantModal(false); setSingleTarget(null);}} className="w-full text-gray-400">Отмена</button>
-                                </div>
-                            </div>
-                        )}
+                        {grantModal && <div className="modal-overlay" onClick={() => {setGrantModal(false); setSingleTarget(null);}}><div className="modal-content" onClick={e => e.stopPropagation()}><h3 className="text-lg font-bold text-white mb-2">{singleTarget ? `Бонус для ${singleTarget.firstName}` : `Рассылка для ${selectedUsers.size} чел.`}</h3><input type="number" placeholder="Сумма токенов" value={gAmount} onChange={e => setGAmount(e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-600 mb-4"/><button onClick={executeGrant} className="w-full bg-green-600 py-2 rounded text-white font-bold mb-2">Начислить</button><button onClick={() => {setGrantModal(false); setSingleTarget(null);}} className="w-full text-gray-400">Отмена</button></div></div>}
                         {adminSupportOpen && <AdminSupport onClose={()=>setAdminSupportOpen(false)} />}
                     </div>
                 );
             };
 
-            // Остальные компоненты (FullScreenModal, PayModal, ShareModal) такие же, как были
             const FullScreenModal = () => {if (!fullscreenItem) return null; return (<div className="modal-overlay" onClick={() => setFullscreenItem(null)}><div className="close-fs-btn" onClick={() => setFullscreenItem(null)}>&times;</div>{fullscreenItem.type === 'image' ? <img src={fullscreenItem.url} className="fullscreen-media" onClick={e => e.stopPropagation()} /> : <video src={fullscreenItem.url} controls autoPlay className="fullscreen-media" onClick={e => e.stopPropagation()} />}</div>);};
-            const PayModal = () => {if (!payModalData) return null; return (<div className="modal-overlay" onClick={() => setPayModalData(null)}><div className="modal-content" onClick={e => e.stopPropagation()}><h3 className="text-xl font-bold text-white mb-4">Оплата</h3><div className="text-blue-400 font-bold mb-4">{payModalData.name}</div><div className="text-2xl font-bold text-green-400 mb-4">{payModalData.price} ₽</div><button onClick={() => processPurchase(payModalData.tokens, payModalData.price, payModalData.name)} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3">Оплатить (Тест)</button><button onClick={() => setPayModalData(null)} className="w-full text-gray-500 py-2">Отмена</button></div></div>);};
-            const ShareModal = () => {if (!shareModalItem) return null; return (<div className="modal-overlay" onClick={() => setShareModalItem(null)}><div className="modal-content"><h3 className="text-white mb-4">Поделиться</h3><button onClick={()=>{navigator.clipboard.writeText(shareModalItem.url); setShareModalItem(null)}} className="w-full bg-blue-600 text-white py-3 rounded mb-2">Копия ссылки</button><button onClick={() => setShareModalItem(null)} className="text-gray-400">Закрыть</button></div></div>);};
+            const PayModal = () => {if (!payModalData) return null; const { name, price, tokens } = payModalData; return (<div className="modal-overlay" onClick={() => setPayModalData(null)}><div className="modal-content" onClick={e => e.stopPropagation()}><h3 className="text-xl font-bold text-white mb-1">Оплата</h3><div className="text-blue-400 font-bold mb-4">{name}</div><div className="text-gray-400 text-sm mb-4">Вы получаете: <b className="text-white">{tokens} токенов</b></div><div className="bg-white p-2 rounded-xl mb-4 inline-block"><img src={config.qrUrl} alt="QR" className="w-40 h-40 object-contain"/></div><div className="text-center mb-4"><span className="text-2xl font-bold text-green-400">{price} ₽</span></div><a href={config.paymentLink} target="_blank" className="block w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 shadow-lg transform active:scale-95 transition">Перейти к оплате</a><button onClick={() => setPayModalData(null)} className="w-full text-gray-400 py-2">Отмена</button></div></div>);};
+            const ShareModal = () => {if (!shareModalItem) return null; const { url, prompt } = shareModalItem; return (<div className="modal-overlay" onClick={() => setShareModalItem(null)}><div className="modal-content" onClick={e => e.stopPropagation()}><h3 className="text-xl font-bold text-white mb-4">Поделиться</h3><div className="space-y-3"><button onClick={()=>{window.Telegram.WebApp.switchInlineQuery(prompt); setShareModalItem(null)}} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"><i className="fas fa-paper-plane"></i> В Telegram</button><button onClick={() => {if (navigator.share) navigator.share({ title: 'AI Bot', text: prompt, url: url }); else window.Telegram.WebApp.showAlert("Используйте копирование ссылки");}} className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"><i className="fas fa-share-alt"></i> Системный</button><button onClick={()=>{navigator.clipboard.writeText(url); window.Telegram.WebApp.showAlert("Скопировано!"); setShareModalItem(null);}} className="w-full bg-gray-800 text-white py-3 rounded-xl font-bold flex items-center justify-center border border-gray-600 gap-2"><i className="fas fa-link"></i> Копия ссылки</button><button onClick={() => setShareModalItem(null)} className="w-full text-gray-400 py-2">Закрыть</button></div></div></div>);};
 
-            const NavItem = ({ id, icon, label }) => (
-                <button onClick={() => setActiveTab(id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === id ? 'text-blue-500 scale-110' : 'text-gray-500'}`}>
-                    <i className={`fas ${icon} text-xl mb-1`}></i><span className="text-[10px] font-medium">{label}</span>
-                </button>
-            );
+            const NavItem = ({ id, icon, label }) => (<button onClick={() => setActiveTab(id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === id ? 'text-blue-500 scale-110' : 'text-gray-500'}`}><i className={`fas ${icon} text-xl mb-1`}></i><span className="text-[10px] font-medium">{label}</span></button>);
 
             if (isLoading) return <div className="flex h-screen items-center justify-center text-blue-500"><i className="fas fa-circle-notch fa-spin text-2xl"></i></div>;
             
@@ -800,6 +1007,7 @@
                     {activeTab === 'profile' && <TabProfile />}
                     {activeTab === 'admin' && <TabAdmin />}
                     
+                    {/* Меню скрываем, если открыт конкретный чат */}
                     {!(activeTab === 'chat' && document.querySelector('.chat-input-area')) && (
                         <div className="fixed bottom-0 left-0 right-0 bg-[#1c2936] border-t border-gray-800 pb-safe pt-2 px-6 flex justify-around z-50 h-[70px]">
                             <NavItem id="generate" icon="fa-wand-magic-sparkles" label="Имидж" />
@@ -818,10 +1026,7 @@
                          <div className="modal-overlay" onClick={() => setNotification(null)}>
                             <div className="modal-content text-center">
                                 {notification.type === 'gift' ? (
-                                    <>
-                                        <div className="text-4xl mb-2">🎁</div>
-                                        <h3 className="text-xl font-bold text-white mb-2">Подарок!</h3>
-                                    </>
+                                    <><div className="text-4xl mb-2">🎁</div><h3 className="text-xl font-bold text-white mb-2">Подарок!</h3></>
                                 ) : (
                                     <h3 className="text-xl font-bold text-white mb-2">Поддержка</h3>
                                 )}
