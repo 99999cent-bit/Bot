@@ -1,1048 +1,1288 @@
-<!DOCTYPE html>
-<html lang="ru">
+<!DOCTYPE html><html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Bot Pro</title>
+    <title>AI Bot Pro</title><script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+<style>
+    body {
+        background-color: var(--tg-theme-bg-color, #17212b);
+        color: var(--tg-theme-text-color, #ffffff);
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+        overflow-x: hidden;
+        min-height: 100vh; 
+        margin: 0;
+        padding-bottom: 0;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+    }
     
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://telegram.org/js/telegram-web-app.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    .hide-scrollbar::-webkit-scrollbar { display: none; }
+    
+    .message-bubble { max-width: 85%; border-radius: 16px; padding: 12px; margin-bottom: 8px; font-size: 15px; line-height: 1.4; word-wrap: break-word; }
+    .user-msg { background-color: #3390ec; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
+    .ai-msg { background-color: #2b2b2b; color: #e4e4e4; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .admin-msg { background-color: #e05353; color: white; align-self: flex-start; border-bottom-left-radius: 4px; }
+    
+    .page-enter { opacity: 0; animation: fadeIn 0.3s forwards; }
+    @keyframes fadeIn { to { opacity: 1; } }
+    
+    .slide-down { animation: slideDown 0.4s ease-out; }
+    @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
 
-    <style>
-        body {
-            background-color: var(--tg-theme-bg-color, #17212b);
-            color: var(--tg-theme-text-color, #ffffff);
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            overflow-x: hidden;
-            min-height: 100vh; 
-            margin: 0;
-            padding-bottom: 0;
-            -webkit-tap-highlight-color: transparent;
-            user-select: none;
-        }
-        
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        
-        .message-bubble { max-width: 85%; border-radius: 16px; padding: 12px; margin-bottom: 8px; font-size: 15px; line-height: 1.4; word-wrap: break-word; }
-        .user-msg { background-color: #3390ec; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .ai-msg { background-color: #2b2b2b; color: #e4e4e4; align-self: flex-start; border-bottom-left-radius: 4px; }
-        .admin-msg { background-color: #e05353; color: white; align-self: flex-start; border-bottom-left-radius: 4px; }
-        .support-user { background-color: #3390ec; color: white; align-self: flex-end; border-bottom-right-radius: 4px; }
-        .support-admin { background-color: #2b2b2b; color: #e4e4e4; align-self: flex-start; border-bottom-left-radius: 4px; }
+    .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 40px; backdrop-filter: blur(5px); overflow-y: auto; }
+    .modal-content { background: #1c2936; padding: 20px; border-radius: 20px; width: 90%; max-width: 350px; text-align: center; border: 1px solid #3390ec; position: relative; margin-bottom: 20px; flex-shrink: 0; }
+    
+    .fullscreen-media { max-width: 100%; max-height: 80vh; object-fit: contain; }
+    .close-fs-btn { position: absolute; top: 20px; right: 20px; color: white; font-size: 30px; background: rgba(0,0,0,0.5); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 101; cursor: pointer; }
 
-        .page-enter { opacity: 0; animation: fadeIn 0.3s forwards; }
-        @keyframes fadeIn { to { opacity: 1; } }
-        
-        .slide-down { animation: slideDown 0.4s ease-out; }
-        @keyframes slideDown { from { opacity: 0; transform: translateY(-20px); } to { opacity: 1; transform: translateY(0); } }
+    .tariff-card { background: linear-gradient(145deg, #2b3c4e, #1c2936); border: 1px solid #334e68; transition: transform 0.1s; position: relative; overflow: hidden; }
+    .tariff-card:active { transform: scale(0.98); }
 
-        .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.9); z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 40px; backdrop-filter: blur(5px); overflow-y: auto; }
-        .modal-content { background: #1c2936; padding: 20px; border-radius: 20px; width: 90%; max-width: 350px; text-align: center; border: 1px solid #3390ec; position: relative; margin-bottom: 20px; flex-shrink: 0; display: flex; flex-direction: column; }
-        
-        .fullscreen-media { max-width: 100%; max-height: 80vh; object-fit: contain; }
-        .close-fs-btn { position: absolute; top: 20px; right: 20px; color: white; font-size: 30px; background: rgba(0,0,0,0.5); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; z-index: 101; cursor: pointer; }
+    .media-card { background: #1c2936; border-radius: 16px; overflow: hidden; margin-top: 16px; border: 1px solid #2b3c4e; position: relative; }
+    .media-actions { display: flex; border-top: 1px solid #2b3c4e; }
+    .media-btn { flex: 1; padding: 12px; text-align: center; color: #3390ec; font-weight: bold; font-size: 14px; background: rgba(255,255,255,0.02); }
+    .media-btn:active { background: rgba(255,255,255,0.05); }
 
-        .tariff-card { background: linear-gradient(145deg, #2b3c4e, #1c2936); border: 1px solid #334e68; transition: transform 0.1s; position: relative; overflow: hidden; }
-        .tariff-card:active { transform: scale(0.98); }
+    .chat-input-area { position: fixed; bottom: 0; left: 0; right: 0; background: #17212b; padding: 10px; border-top: 1px solid #2b2b2b; z-index: 50; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+    
+    .chat-item { background: #233040; border-radius: 12px; padding: 12px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
+    .chat-item:active { transform: scale(0.98); background: #2b3c4e; }
+    
+    .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: #ff4d4d; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: transform 0.2s; }
+    .delete-btn:active { transform: scale(0.9); background: rgba(255,0,0,0.2); }
 
-        .media-card { background: #1c2936; border-radius: 16px; overflow: hidden; margin-top: 16px; border: 1px solid #2b3c4e; position: relative; }
-        .media-actions { display: flex; border-top: 1px solid #2b3c4e; }
-        .media-btn { flex: 1; padding: 12px; text-align: center; color: #3390ec; font-weight: bold; font-size: 14px; background: rgba(255,255,255,0.02); }
-        .media-btn:active { background: rgba(255,255,255,0.05); }
+    .tab-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; border-radius: 8px; transition: all 0.2s; color: #8a9aa9; }
+    .tab-btn.active { background: #3390ec; color: white; }
 
-        .chat-input-area { position: fixed; bottom: 0; left: 0; right: 0; background: #17212b; padding: 10px; border-top: 1px solid #2b2b2b; z-index: 50; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
-        
-        .chat-item { background: #233040; border-radius: 12px; padding: 12px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
-        .chat-item:active { transform: scale(0.98); background: #2b3c4e; }
-        
-        .delete-btn { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.6); color: #ff4d4d; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; z-index: 10; transition: transform 0.2s; }
-        .delete-btn:active { transform: scale(0.9); background: rgba(255,0,0,0.2); }
-        
-        .tab-btn { flex: 1; padding: 8px; font-size: 12px; font-weight: bold; border-radius: 8px; transition: all 0.2s; color: #8a9aa9; }
-        .tab-btn.active { background: #3390ec; color: white; }
+    .custom-checkbox { width: 20px; height: 20px; border: 2px solid #555; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+    .custom-checkbox.checked { background: #3390ec; border-color: #3390ec; }
+    .custom-checkbox i { font-size: 12px; color: white; display: none; }
+    .custom-checkbox.checked i { display: block; }
+    
+    .msg-badge { background: #e05353; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
 
-        .custom-checkbox { width: 20px; height: 20px; border: 2px solid #555; border-radius: 6px; display: flex; align-items: center; justify-content: center; transition: all 0.2s; cursor: pointer; }
-        .custom-checkbox.checked { background: #3390ec; border-color: #3390ec; }
-        .custom-checkbox i { font-size: 12px; color: white; display: none; }
-        .custom-checkbox.checked i { display: block; }
-        
-        .msg-badge { background: #e05353; color: white; font-size: 10px; padding: 2px 6px; border-radius: 10px; margin-left: 5px; }
-        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-        .status-green { background: #22c55e; box-shadow: 0 0 5px #22c55e; }
-        .status-yellow { background: #eab308; }
-        .status-gray { background: #6b7280; }
-    </style>
+    .status-dot { width:10px; height:10px; border-radius:50%; display:inline-block; margin-right:8px; }
+    .status-green { background: #24c94d; }
+    .status-yellow { background: #f0b429; }
+</style>
+
 </head>
 <body>
-    <div id="root"></div>
+    <div id="root"></div><script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
+    import { 
+        getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion, collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc, writeBatch, orderBy, deleteField
+    } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-analytics.js";
-        import { 
-            getFirestore, doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion, collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc, writeBatch, orderBy, deleteField
-        } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+    const firebaseConfig = {
+        apiKey: "AIzaSyCbzbhEn__nA9TXawnqRVU2DbZFyeJa_2U",
+        authDomain: "aigenerator75-3fb8e.firebaseapp.com",
+        projectId: "aigenerator75-3fb8e",
+        storageBucket: "aigenerator75-3fb8e.firebasestorage.app",
+        messagingSenderId: "1018038849306",
+        appId: "1:1018038849306:web:462e241a3940ff591ee6a3",
+        measurementId: "G-W8TPE5PLEF"
+    };
 
-        const firebaseConfig = {
-            apiKey: "AIzaSyCbzbhEn__nA9TXawnqRVU2DbZFyeJa_2U",
-            authDomain: "aigenerator75-3fb8e.firebaseapp.com",
-            projectId: "aigenerator75-3fb8e",
-            storageBucket: "aigenerator75-3fb8e.firebasestorage.app",
-            messagingSenderId: "1018038849306",
-            appId: "1:1018038849306:web:462e241a3940ff591ee6a3",
-            measurementId: "G-W8TPE5PLEF"
-        };
+    const app = initializeApp(firebaseConfig);
+    const analytics = getAnalytics(app);
+    const db = getFirestore(app);
 
-        const app = initializeApp(firebaseConfig);
-        const analytics = getAnalytics(app);
-        const db = getFirestore(app);
+    window.db = db;
+    window.fs = { 
+        doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion, 
+        collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc, writeBatch, orderBy, deleteField 
+    };
+    window.firebaseReady = true;
+    document.dispatchEvent(new Event('firebase-ready'));
+</script>
 
-        window.db = db;
-        window.fs = { 
-            doc, getDoc, setDoc, updateDoc, onSnapshot, increment, arrayUnion, 
-            collection, getDocs, query, where, addDoc, serverTimestamp, deleteDoc, writeBatch, orderBy, deleteField 
-        };
-        window.firebaseReady = true;
-        document.dispatchEvent(new Event('firebase-ready'));
-    </script>
+<script type="text/babel">
+    const { useState, useEffect, useRef, useMemo } = React;
+    
+    const ADMIN_ID = 442529744; 
+    const DEFAULT_BASE_URL = "https://99999cent-bit.github.io/Bot/"; 
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef, useMemo } = React;
+    const copyToClipboard = async (text) => {
+        try {
+            if (navigator.clipboard && window.isSecureContext) {
+                await navigator.clipboard.writeText(text);
+                return true;
+            } else {
+                const textArea = document.createElement("textarea");
+                textArea.value = text;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-9999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+                return true;
+            }
+        } catch (err) {
+            return false;
+        }
+    };
+
+    const App = () => {
+        const [activeTab, setActiveTab] = useState('generate');
+        const [genType, setGenType] = useState('image'); 
+        const [user, setUser] = useState(null);
+        const [isLoading, setIsLoading] = useState(true);
+        const [globalHistory, setGlobalHistory] = useState([]);
+        const [payModalData, setPayModalData] = useState(null);
+        const [shareModalItem, setShareModalItem] = useState(null);
+        const [fullscreenItem, setFullscreenItem] = useState(null); 
+        const [dbUser, setDbUser] = useState({ balance: 0, referrals: 0, firstName: '', spent: 0, totalDonated: 0 });
         
-        const ADMIN_ID = 442529744; 
-        const DEFAULT_BASE_URL = "https://99999cent-bit.github.io/Bot/"; 
+        // Состояния для уведомлений и поддержки
+        const [notification, setNotification] = useState(null); // Всплывающее уведомление
+        const [supportModalOpen, setSupportModalOpen] = useState(false); // Объект или false
 
-        const copyToClipboard = async (text) => {
-            try {
-                if (navigator.clipboard && window.isSecureContext) {
-                    await navigator.clipboard.writeText(text);
-                    return true;
-                } else {
-                    const textArea = document.createElement("textarea");
-                    textArea.value = text;
-                    textArea.style.position = "fixed";
-                    textArea.style.left = "-9999px";
-                    document.body.appendChild(textArea);
-                    textArea.focus();
-                    textArea.select();
-                    document.execCommand('copy');
-                    document.body.removeChild(textArea);
-                    return true;
+        const [historyModalUser, setHistoryModalUser] = useState(null);
+        const [grantModalUser, setGrantModalUser] = useState(null);
+        const [modalGrantAmount, setModalGrantAmount] = useState('');
+        
+        // Счетчик непрочитанных сообщений поддержки для админа
+        const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+
+        const [config, setConfig] = useState({
+            priceImage: 50, priceVideo: 300, priceText: 10,
+            welcomeBonus: 100, referralReward: 50,
+            tokenPriceRub: 1.0, 
+            paymentLink: "", 
+            qrUrl: "https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg",
+            botToken: "",
+            referralBaseUrl: DEFAULT_BASE_URL,
+            tariffs: [
+                { id: 1, name: '🚀 Старт', tokens: 100, price: 99 },
+                { id: 2, name: '💎 Профи', tokens: 500, price: 450 },
+                { id: 3, name: '👑 Олигарх', tokens: 1000, price: 800 }
+            ]
+        });
+
+        const longPressTimer = useRef(null);
+
+        useEffect(() => {
+            const initApp = async () => {
+                try {
+                    const tg = window.Telegram.WebApp;
+                    tg.ready();
+                    tg.expand();
+                    tg.enableClosingConfirmation();
+
+                    let telegramUser = tg.initDataUnsafe?.user;
+                    
+                    // СТРОГАЯ ПРОВЕРКА TELEGRAM
+                    if (!telegramUser) {
+                         document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:white;text-align:center;background:#17212b;">Пожалуйста, откройте приложение через Telegram бот.</div>';
+                         return;
+                    }
+                    
+                    if (!window.firebaseReady) await new Promise(r => document.addEventListener('firebase-ready', r));
+
+                    const { doc, getDoc, setDoc, updateDoc, onSnapshot, increment, collection, query, where } = window.fs;
+                    const db = window.db;
+
+                    // Настройки
+                    const configRef = doc(db, "settings", "global");
+                    const configSnap = await getDoc(configRef);
+                    let currentWelcomeBonus = 100;
+                    let currentReferralReward = 50;
+
+                    if (configSnap.exists()) {
+                        const data = configSnap.data();
+                        setConfig(prev => ({ ...prev, ...data }));
+                        currentWelcomeBonus = data.welcomeBonus !== undefined ? data.welcomeBonus : 100;
+                        currentReferralReward = data.referralReward !== undefined ? data.referralReward : 50;
+                    } else {
+                        setDoc(configRef, config);
+                    }
+                    onSnapshot(configRef, (snap) => { if(snap.exists()) setConfig(prev => ({ ...prev, ...snap.data() })); });
+
+                    // Пользователь
+                    const userRef = doc(db, "users", telegramUser.id.toString());
+                    const userSnap = await getDoc(userRef);
+
+                    if (!userSnap.exists()) {
+                        const startParam = tg.initDataUnsafe?.start_param;
+                        await setDoc(userRef, {
+                            username: telegramUser.username || '',
+                            firstName: telegramUser.first_name || 'Пользователь',
+                            balance: currentWelcomeBonus,
+                            referrals: 0, spent: 0, totalDonated: 0,
+                            invitedBy: startParam || null,
+                            createdAt: new Date().toISOString()
+                        });
+                        logTransaction(telegramUser.id.toString(), 'bonus', currentWelcomeBonus, 0, 'Регистрация');
+
+                        if (startParam && startParam != telegramUser.id) {
+                            const refUserRef = doc(db, "users", startParam.toString());
+                            const refSnap = await getDoc(refUserRef);
+                            if(refSnap.exists()){
+                                updateDoc(refUserRef, { referrals: increment(1), balance: increment(currentReferralReward) });
+                                logTransaction(startParam.toString(), 'bonus', currentReferralReward, 0, 'Приглашение друга');
+                            }
+                        }
+                    }
+                    
+                    setUser({ ...telegramUser, first_name: telegramUser.first_name || 'User' });
+
+                    // Обновляем время последней активности пользователя (чтобы админ видел онлайна)
+                    try { await updateDoc(userRef, { lastActive: window.fs.serverTimestamp() }); } catch(e) { /* ignore */ }
+
+                    // Также обновляем при возвращении на страницу
+                    window.addEventListener('visibilitychange', async () => {
+                        if (document.visibilityState === 'visible' && userRef) {
+                            try { await updateDoc(userRef, { lastActive: window.fs.serverTimestamp() }); } catch(e){}
+                        }
+                    });
+
+                    // Слушаем баланс и уведомления
+                    onSnapshot(userRef, (snap) => {
+                        if (snap.exists()) {
+                            const data = snap.data();
+                            setDbUser(data);
+                            if (data.notification) {
+                                setNotification(data.notification);
+                                updateDoc(userRef, { notification: window.fs.deleteField() });
+                                window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                            }
+                        }
+                    });
+
+                    // История генераций
+                    const historyRef = collection(db, "users", telegramUser.id.toString(), "history");
+                    onSnapshot(historyRef, (snapshot) => {
+                        const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                        list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                        setGlobalHistory(list);
+                    });
+
+                    // Слушаем непрочитанные тикеты (если админ)
+                    if (telegramUser.id === ADMIN_ID) {
+                        const qSupport = query(collection(db, "feedback"), where("status", "==", "new"));
+                        onSnapshot(qSupport, (snap) => {
+                            setUnreadSupportCount(snap.size);
+                        });
+                    }
+
+                } catch (e) {
+                    console.error("Init Error:", e);
+                } finally {
+                    setIsLoading(false);
                 }
-            } catch (err) {
+            };
+            initApp();
+        }, []);
+
+        const logTransaction = async (userId, type, amount, rubAmount, desc) => {
+            try {
+                const { addDoc, collection, serverTimestamp } = window.fs;
+                await addDoc(collection(window.db, "users", userId, "transactions"), {
+                    type: type, amount: amount, amountRub: rubAmount || 0,
+                    description: desc, createdAt: serverTimestamp(), dateStr: new Date().toLocaleString()
+                });
+            } catch(e) { console.error("Log error", e); }
+        };
+
+        const saveConfigToDb = async (newConfig) => {
+            const { updateDoc, doc } = window.fs;
+            await updateDoc(doc(window.db, "settings", "global"), newConfig);
+            window.Telegram.WebApp.showAlert("Сохранено!");
+        };
+
+        const handleSpend = async (amount, desc) => {
+            if (user.id === ADMIN_ID) return true;
+            if (dbUser.balance < amount) {
+                window.Telegram.WebApp.showAlert(`Недостаточно токенов! Нужно ${amount}`);
                 return false;
+            }
+            await window.fs.updateDoc(window.fs.doc(window.db, "users", user.id.toString()), { 
+                balance: window.fs.increment(-amount),
+                spent: window.fs.increment(1)
+            });
+            logTransaction(user.id.toString(), 'spend', amount, 0, desc || 'Генерация');
+            return true; 
+        };
+
+        const processPurchase = async (tokens, priceRub, name) => {
+            const { updateDoc, doc, increment } = window.fs;
+            await updateDoc(doc(window.db, "users", user.id.toString()), { 
+                balance: increment(tokens),
+                totalDonated: increment(priceRub) 
+            });
+            logTransaction(user.id.toString(), 'purchase', tokens, priceRub, name);
+            window.Telegram.WebApp.showAlert(`Куплено ${tokens} токенов!`);
+            setPayModalData(null);
+        };
+
+        const handleDownload = async (e, url) => {
+            if(e && e.stopPropagation) e.stopPropagation();
+            if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
+            try {
+                const response = await fetch(url);
+                const blob = await response.blob();
+                const blobUrl = window.URL.createObjectURL(blob);
+                
+                const link = document.createElement('a');
+                link.href = blobUrl;
+                const ext = genType === 'image' ? 'png' : 'mp4';
+                link.download = `ai_media_${Date.now()}.${ext}`;
+                document.body.appendChild(link);
+                link.click();
+                
+                setTimeout(() => {
+                    document.body.removeChild(link);
+                    window.URL.revokeObjectURL(blobUrl);
+                }, 500);
+                
+                if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+            } catch (e) {
+                window.Telegram.WebApp.openLink(url, { try_instant_view: false });
             }
         };
 
-        const App = () => {
-            const [activeTab, setActiveTab] = useState('generate');
-            const [genType, setGenType] = useState('image'); 
-            const [user, setUser] = useState(null);
-            const [isLoading, setIsLoading] = useState(true);
-            const [globalHistory, setGlobalHistory] = useState([]);
-            const [payModalData, setPayModalData] = useState(null);
-            const [shareModalItem, setShareModalItem] = useState(null);
-            const [fullscreenItem, setFullscreenItem] = useState(null); 
-            const [dbUser, setDbUser] = useState({ balance: 0, referrals: 0, firstName: '', spent: 0, totalDonated: 0, lastActiveAt: null });
-            
-            // Уведомления и поддержка
-            const [notification, setNotification] = useState(null); 
-            const [supportModalOpen, setSupportModalOpen] = useState(false); 
-            
-            const [historyModalUser, setHistoryModalUser] = useState(null);
-            const [unreadSupportCount, setUnreadSupportCount] = useState(0);
+        const handleTouchStart = (item) => {
+            if (item.type === 'video') return; 
+            longPressTimer.current = setTimeout(() => {
+                handleDownload(null, item.url);
+            }, 600); 
+        };
 
-            const [config, setConfig] = useState({
-                priceImage: 50, priceVideo: 300, priceText: 10,
-                welcomeBonus: 100, referralReward: 50,
-                tokenPriceRub: 1.0, 
-                paymentLink: "", 
-                qrUrl: "https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg",
-                botToken: "",
-                referralBaseUrl: DEFAULT_BASE_URL,
-                tariffs: [
-                    { id: 1, name: '🚀 Старт', tokens: 100, price: 99 },
-                    { id: 2, name: '💎 Профи', tokens: 500, price: 450 },
-                    { id: 3, name: '👑 Олигарх', tokens: 1000, price: 800 }
-                ]
+        const handleTouchEnd = () => {
+            if (longPressTimer.current) {
+                clearTimeout(longPressTimer.current);
+                longPressTimer.current = null;
+            }
+        };
+
+        const deleteMedia = async (e, id) => {
+            e.stopPropagation();
+            if(!confirm("Удалить этот файл навсегда?")) return;
+            const { deleteDoc, doc } = window.fs;
+            await deleteDoc(doc(window.db, "users", user.id.toString(), "history", id));
+        };
+
+        const clearAllHistory = async () => {
+            if(!confirm(`Удалить все ${genType === 'image' ? 'изображения' : 'видео'}?`)) return;
+            const { deleteDoc, doc } = window.fs;
+            const items = globalHistory.filter(item => item.type === genType);
+            await Promise.all(items.map(item => deleteDoc(doc(window.db, user.id.toString(), "history", item.id))));
+            window.Telegram.WebApp.showAlert(`Очищено!`);
+        };
+
+        // --- SUPPORT LOGIC ---
+        // When user clicks support button: if user has open support chat - offer Continue / New. Otherwise create new.
+        const handleSupportButton = async () => {
+            if (!user) return;
+            const chatsQ = window.fs.query(
+                window.fs.collection(window.db, "users", user.id.toString(), "chats"),
+                window.fs.orderBy('createdAt','desc')
+            );
+            const snap = await window.fs.getDocs(chatsQ);
+            const supportChats = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(c => c.support === true && c.status !== 'closed');
+            if (supportChats.length > 0) {
+                setSupportModalOpen({ mode: 'choice', chatId: supportChats[0].id });
+            } else {
+                setSupportModalOpen({ mode: 'new' });
+            }
+        };
+
+        const createSupportChatAndOpen = async (initialText) => {
+            const ref = await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats"), {
+                title: 'Поддержка', createdAt: window.fs.serverTimestamp(), support: true, status: 'open'
             });
+            // add first message if present
+            if (initialText && initialText.trim()) {
+                await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats", ref.id, "messages"), {
+                    role: 'user', text: initialText, createdAt: window.fs.serverTimestamp()
+                });
+                // also create global feedback for admin
+                await window.fs.addDoc(window.fs.collection(window.db, "feedback"), {
+                    userId: user.id, userName: user.first_name, username: user.username, text: initialText, status: 'new', reply: '', chatId: ref.id, createdAt: window.fs.serverTimestamp()
+                });
+            } else {
+                await window.fs.addDoc(window.fs.collection(window.db, "feedback"), {
+                    userId: user.id, userName: user.first_name, username: user.username, text: 'Новый запрос', status: 'new', reply: '', chatId: ref.id, createdAt: window.fs.serverTimestamp()
+                });
+            }
+            // open chat
+            window.openChatId = ref.id;
+            setSupportModalOpen(false);
+            setActiveTab('chat');
+        };
 
-            const longPressTimer = useRef(null);
+        const continueSupportChat = (chatId) => {
+            window.openChatId = chatId;
+            setSupportModalOpen(false);
+            setActiveTab('chat');
+        };
+
+        const sendSupportMessage = async (text, chatId=null) => {
+            if(!text || !text.trim()) return;
+            // if chatId provided -> append to chat messages + add feedback entry
+            if (!chatId) {
+                // try to find an open support chat
+                const chatsQ = window.fs.query(
+                    window.fs.collection(window.db, "users", user.id.toString(), "chats"),
+                    window.fs.orderBy('createdAt','desc')
+                );
+                const snap = await window.fs.getDocs(chatsQ);
+                const supportChats = snap.docs.map(d => ({id:d.id, ...d.data()})).filter(c => c.support === true && c.status !== 'closed');
+                if (supportChats.length > 0) chatId = supportChats[0].id;
+            }
+            if (chatId) {
+                await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats", chatId, "messages"), {
+                    role: 'user', text: text, createdAt: window.fs.serverTimestamp()
+                });
+                await window.fs.addDoc(window.fs.collection(window.db, "feedback"), {
+                    userId: user.id, userName: user.first_name, username: user.username, text: text, status: 'new', reply: '', chatId: chatId, createdAt: window.fs.serverTimestamp()
+                });
+                window.Telegram.WebApp.showAlert("Сообщение отправлено! Ждите ответа.");
+                setSupportModalOpen(false);
+                // open chat
+                window.openChatId = chatId;
+                setActiveTab('chat');
+            } else {
+                // fallback: create new support chat with message
+                await createSupportChatAndOpen(text);
+            }
+        };
+
+        // --- COMPONENTS ---
+
+        const HistoryModal = () => {
+            if (!historyModalUser) return null;
+            const [txs, setTxs] = useState([]);
+            const [hTab, setHTab] = useState('spent'); 
 
             useEffect(() => {
-                const initApp = async () => {
-                    try {
-                        const tg = window.Telegram.WebApp;
-                        tg.ready();
-                        tg.expand();
-                        tg.enableClosingConfirmation();
-
-                        let telegramUser = tg.initDataUnsafe?.user;
-                        
-                        // СТРОГАЯ ПРОВЕРКА TELEGRAM (если раскомментировать нижнюю строку, будет работать только в ТГ)
-                        if (!telegramUser) {
-                             // telegramUser = { id: ADMIN_ID, first_name: 'Admin', username: 'admin' }; // DEBUG ONLY
-                             if (!telegramUser) {
-                                document.body.innerHTML = '<div style="display:flex;justify-content:center;align-items:center;height:100vh;color:white;text-align:center;background:#17212b;">Пожалуйста, откройте приложение через Telegram бот.</div>';
-                                return;
-                             }
-                        }
-                        
-                        if (!window.firebaseReady) await new Promise(r => document.addEventListener('firebase-ready', r));
-
-                        const { doc, getDoc, setDoc, updateDoc, onSnapshot, increment, collection, query, where, serverTimestamp } = window.fs;
-                        const db = window.db;
-
-                        const configRef = doc(db, "settings", "global");
-                        const configSnap = await getDoc(configRef);
-                        let currentWelcomeBonus = 100, currentReferralReward = 50;
-
-                        if (configSnap.exists()) {
-                            const data = configSnap.data();
-                            setConfig(prev => ({ ...prev, ...data }));
-                            currentWelcomeBonus = data.welcomeBonus ?? 100;
-                            currentReferralReward = data.referralReward ?? 50;
-                        } else { setDoc(configRef, config); }
-                        
-                        onSnapshot(configRef, (snap) => { if(snap.exists()) setConfig(prev => ({ ...prev, ...snap.data() })); });
-
-                        const userRef = doc(db, "users", telegramUser.id.toString());
-                        const userSnap = await getDoc(userRef);
-
-                        const updateOnline = () => updateDoc(userRef, { lastActiveAt: serverTimestamp() }).catch(()=>{});
-
-                        if (!userSnap.exists()) {
-                            const startParam = tg.initDataUnsafe?.start_param;
-                            await setDoc(userRef, {
-                                username: telegramUser.username || '',
-                                firstName: telegramUser.first_name || 'Пользователь',
-                                balance: currentWelcomeBonus,
-                                referrals: 0, spent: 0, totalDonated: 0,
-                                invitedBy: startParam || null,
-                                createdAt: new Date().toISOString(),
-                                lastActiveAt: serverTimestamp()
-                            });
-                            logTransaction(telegramUser.id.toString(), 'bonus', currentWelcomeBonus, 0, 'Регистрация');
-
-                            if (startParam && startParam != telegramUser.id) {
-                                const refUserRef = doc(db, "users", startParam.toString());
-                                const refSnap = await getDoc(refUserRef);
-                                if(refSnap.exists()){
-                                    updateDoc(refUserRef, { referrals: increment(1), balance: increment(currentReferralReward) });
-                                    logTransaction(startParam.toString(), 'bonus', currentReferralReward, 0, 'Приглашение друга');
-                                }
-                            }
-                        } else {
-                            updateOnline();
-                        }
-                        
-                        setUser({ ...telegramUser, first_name: telegramUser.first_name || 'User' });
-                        
-                        onSnapshot(userRef, (snap) => {
-                            if (snap.exists()) {
-                                const data = snap.data();
-                                setDbUser(data);
-                                if (data.notification) {
-                                    setNotification(data.notification);
-                                    updateDoc(userRef, { notification: window.fs.deleteField() });
-                                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                                }
-                            }
-                        });
-
-                        const historyRef = collection(db, "users", telegramUser.id.toString(), "history");
-                        onSnapshot(historyRef, (snapshot) => {
-                            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                            list.sort((a,b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                            setGlobalHistory(list);
-                        });
-
-                        if (telegramUser.id === ADMIN_ID) {
-                            const qSupport = query(collection(db, "support_tickets"), where("status", "==", "open"), where("hasUnreadAdmin", "==", true));
-                            onSnapshot(qSupport, (snap) => setUnreadSupportCount(snap.size));
-                        }
-
-                    } catch (e) {
-                        console.error("Init Error:", e);
-                    } finally {
-                        setIsLoading(false);
-                    }
-                };
-                initApp();
-            }, []);
-
-            const logTransaction = async (userId, type, amount, rubAmount, desc) => {
-                try {
-                    const { addDoc, collection, serverTimestamp } = window.fs;
-                    await addDoc(collection(window.db, "users", userId, "transactions"), {
-                        type, amount, amountRub: rubAmount || 0, description: desc, createdAt: serverTimestamp(), dateStr: new Date().toLocaleString()
-                    });
-                } catch(e) {}
-            };
-
-            const saveConfigToDb = async (newConfig) => {
-                const { updateDoc, doc } = window.fs;
-                await updateDoc(doc(window.db, "settings", "global"), newConfig);
-                window.Telegram.WebApp.showAlert("Сохранено!");
-            };
-
-            const handleSpend = async (amount, desc) => {
-                if (user.id === ADMIN_ID) return true;
-                if (dbUser.balance < amount) {
-                    window.Telegram.WebApp.showAlert(`Недостаточно токенов! Нужно ${amount}`);
-                    return false;
-                }
-                await window.fs.updateDoc(window.fs.doc(window.db, "users", user.id.toString()), { 
-                    balance: window.fs.increment(-amount),
-                    spent: window.fs.increment(1),
-                    lastActiveAt: window.fs.serverTimestamp()
+                const q = window.fs.query(
+                    window.fs.collection(window.db, "users", historyModalUser.id.toString(), "transactions"),
+                    window.fs.orderBy('createdAt', 'desc')
+                );
+                return window.fs.onSnapshot(q, (snap) => {
+                    setTxs(snap.docs.map(d => ({id:d.id, ...d.data()})));
                 });
-                logTransaction(user.id.toString(), 'spend', amount, 0, desc || 'Генерация');
-                return true; 
-            };
+            }, [historyModalUser]);
 
-            const processPurchase = async (tokens, priceRub, name) => {
-                const { updateDoc, doc, increment } = window.fs;
-                await updateDoc(doc(window.db, "users", user.id.toString()), { 
-                    balance: increment(tokens),
-                    totalDonated: increment(priceRub),
-                    lastActiveAt: window.fs.serverTimestamp()
-                });
-                logTransaction(user.id.toString(), 'purchase', tokens, priceRub, name);
-                window.Telegram.WebApp.showAlert(`Куплено ${tokens} токенов!`);
-                setPayModalData(null);
-            };
+            const filtered = txs.filter(t => {
+                if (hTab === 'spent') return t.type === 'spend';
+                if (hTab === 'bonus') return t.type === 'bonus';
+                if (hTab === 'purchase') return t.type === 'purchase';
+                return true;
+            });
 
-            const handleDownload = async (e, url) => {
-                if(e && e.stopPropagation) e.stopPropagation();
-                if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
-                try {
-                    const response = await fetch(url);
-                    const blob = await response.blob();
-                    const blobUrl = window.URL.createObjectURL(blob);
-                    const link = document.createElement('a');
-                    link.href = blobUrl;
-                    const ext = genType === 'image' ? 'png' : 'mp4';
-                    link.download = `ai_media_${Date.now()}.${ext}`;
-                    document.body.appendChild(link);
-                    link.click();
-                    setTimeout(() => { document.body.removeChild(link); window.URL.revokeObjectURL(blobUrl); }, 500);
-                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                } catch (e) {
-                    window.Telegram.WebApp.openLink(url, { try_instant_view: false });
-                }
-            };
+            return (
+                <div className="modal-overlay" onClick={() => setHistoryModalUser(null)}>
+                    <div className="modal-content w-full h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                        <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2">
+                            <h3 className="font-bold text-white text-lg">История: {historyModalUser.firstName}</h3>
+                            <button onClick={() => setHistoryModalUser(null)} className="text-gray-400"><i className="fas fa-times"></i></button>
+                        </div>
+                        
+                        <div className="flex bg-gray-900 rounded-lg p-1 mb-4 shrink-0">
+                            <button onClick={()=>setHTab('spent')} className={`tab-btn ${hTab==='spent'?'active':''}`}>Потрачено</button>
+                            <button onClick={()=>setHTab('bonus')} className={`tab-btn ${hTab==='bonus'?'active':''}`}>Бонусы</button>
+                            <button onClick={()=>setHTab('purchase')} className={`tab-btn ${hTab==='purchase'?'active':''}`}>Куплено</button>
+                        </div>
 
-            const handleTouchStart = (item) => {
-                if (item.type === 'video') return; 
-                longPressTimer.current = setTimeout(() => handleDownload(null, item.url), 600); 
-            };
+                        <div className="flex-1 overflow-y-auto text-left space-y-2">
+                            {filtered.length === 0 && <div className="text-gray-500 text-center text-sm mt-4">Пусто</div>}
+                            {filtered.map(t => (
+                                <div key={t.id} className="bg-gray-800 p-3 rounded-xl border border-gray-700 text-sm">
+                                    <div className="flex justify-between mb-1">
+                                        <span className="text-white font-bold">{t.description || 'Операция'}</span>
+                                        <span className={`font-mono ${t.type==='spend'?'text-red-400':'text-green-400'}`}>
+                                            {t.type==='spend'?'-':'+'}{t.amount} т.
+                                        </span>
+                                    </div>
+                                    <div className="flex justify-between text-xs text-gray-500">
+                                        <span>{t.dateStr}</span>
+                                        {t.amountRub > 0 && <span className="text-yellow-500">{t.amountRub} ₽</span>}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            );
+        };
 
-            const handleTouchEnd = () => { if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; } };
+        const SupportModal = () => {
+            if(!supportModalOpen) return null;
+            const [msg, setMsg] = useState("");
 
-            const deleteMedia = async (e, id) => {
-                e.stopPropagation();
-                if(!confirm("Удалить этот файл навсегда?")) return;
-                const { deleteDoc, doc } = window.fs;
-                await deleteDoc(doc(window.db, "users", user.id.toString(), "history", id));
-            };
-
-            const clearAllHistory = async () => {
-                if(!confirm(`Удалить все ${genType === 'image' ? 'изображения' : 'видео'}?`)) return;
-                const { deleteDoc, doc } = window.fs;
-                const items = globalHistory.filter(item => item.type === genType);
-                await Promise.all(items.map(item => deleteDoc(doc(window.db, "users", user.id.toString(), "history", item.id))));
-                window.Telegram.WebApp.showAlert(`Очищено!`);
-            };
-
-            // --- ПОДДЕРЖКА (НОВАЯ ЛОГИКА) ---
-            const SupportModal = () => {
-                const [ticket, setTicket] = useState(null);
-                const [msgs, setMsgs] = useState([]);
-                const [input, setInput] = useState("");
-                const [view, setView] = useState("loading"); // loading, menu, chat
-                const messagesEndRef = useRef(null);
-
-                useEffect(() => {
-                    const q = window.fs.query(
-                        window.fs.collection(window.db, "support_tickets"),
-                        window.fs.where("userId", "==", user.id),
-                        window.fs.where("status", "==", "open"),
-                        window.fs.limit(1)
-                    );
-                    const unsub = window.fs.onSnapshot(q, (snap) => {
-                        if (!snap.empty) {
-                            setTicket({ id: snap.docs[0].id, ...snap.docs[0].data() });
-                            setView("menu");
-                        } else {
-                            setView("chat");
-                            setTicket(null);
-                        }
-                    });
-                    return () => unsub();
-                }, []);
-
-                useEffect(() => {
-                    if (ticket && view === "chat") {
-                        const q = window.fs.query(
-                            window.fs.collection(window.db, "support_tickets", ticket.id, "messages"),
-                            window.fs.orderBy("createdAt", "asc")
-                        );
-                        return window.fs.onSnapshot(q, (snap) => {
-                            setMsgs(snap.docs.map(d => d.data()));
-                            setTimeout(() => messagesEndRef.current?.scrollIntoView({behavior:"smooth"}), 100);
-                        });
-                    } else {
-                        setMsgs([]);
-                    }
-                }, [ticket, view]);
-
-                const sendMsg = async () => {
-                    if(!input.trim()) return;
-                    let currentTicketId = ticket?.id;
-
-                    if (!currentTicketId) {
-                        const ref = await window.fs.addDoc(window.fs.collection(window.db, "support_tickets"), {
-                            userId: user.id,
-                            userName: user.first_name,
-                            status: "open",
-                            hasUnreadAdmin: true,
-                            createdAt: window.fs.serverTimestamp(),
-                            updatedAt: window.fs.serverTimestamp()
-                        });
-                        currentTicketId = ref.id;
-                    } else {
-                         window.fs.updateDoc(window.fs.doc(window.db, "support_tickets", currentTicketId), {
-                            updatedAt: window.fs.serverTimestamp(),
-                            hasUnreadAdmin: true
-                         });
-                    }
-
-                    await window.fs.addDoc(window.fs.collection(window.db, "support_tickets", currentTicketId, "messages"), {
-                        sender: "user",
-                        text: input,
-                        createdAt: window.fs.serverTimestamp()
-                    });
-                    setInput("");
-                };
-
-                const closeTicket = async () => {
-                     if(ticket) {
-                         await window.fs.updateDoc(window.fs.doc(window.db, "support_tickets", ticket.id), { status: "closed" });
-                         setTicket(null);
-                         setMsgs([]);
-                         setView("chat"); 
-                     }
-                };
-
-                if (!supportModalOpen) return null;
-
+            // modes: 'choice' -> show Continue / New, 'new' -> show textarea, null false -> hidden
+            if (supportModalOpen.mode === 'choice') {
                 return (
                     <div className="modal-overlay" onClick={() => setSupportModalOpen(false)}>
-                        <div className="modal-content w-full h-[80vh] flex flex-col p-0 overflow-hidden" onClick={e => e.stopPropagation()}>
-                            <div className="bg-[#233040] p-4 flex justify-between items-center border-b border-gray-700">
-                                <h3 className="font-bold text-white">🆘 Поддержка</h3>
-                                <button onClick={() => setSupportModalOpen(false)}><i className="fas fa-times text-gray-400"></i></button>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                            <h3 className="text-lg font-bold text-white mb-2">Поддержка</h3>
+                            <p className="text-sm text-gray-300 mb-4">У вас есть открытое обращение. Что Вы хотите сделать?</p>
+                            <div className="flex gap-2">
+                                <button onClick={() => continueSupportChat(supportModalOpen.chatId)} className="flex-1 bg-blue-600 text-white py-2 rounded">Продолжить</button>
+                                <button onClick={() => setSupportModalOpen({ mode: 'new' })} className="flex-1 bg-gray-700 text-white py-2 rounded">Создать новый</button>
                             </div>
-
-                            {view === "menu" && (
-                                <div className="flex-1 flex flex-col justify-center items-center p-6 space-y-4">
-                                    <p className="text-gray-300 text-center mb-4">У вас есть открытое обращение.</p>
-                                    <button onClick={()=>setView("chat")} className="w-full bg-blue-600 py-3 rounded-xl font-bold text-white">Продолжить переписку</button>
-                                    <button onClick={closeTicket} className="w-full bg-gray-700 py-3 rounded-xl text-white">Создать новый запрос</button>
-                                </div>
-                            )}
-
-                            {view === "chat" && (
-                                <>
-                                    <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#17212b]">
-                                        {msgs.length === 0 && <div className="text-gray-500 text-center mt-4">Опишите вашу проблему...</div>}
-                                        {msgs.map((m, i) => (
-                                            <div key={i} className={`message-bubble ${m.sender==='user'?'support-user':'support-admin'}`}>
-                                                {m.text}
-                                            </div>
-                                        ))}
-                                        <div ref={messagesEndRef}></div>
-                                    </div>
-                                    <div className="p-3 bg-[#233040] flex gap-2">
-                                        <input value={input} onChange={e=>setInput(e.target.value)} className="flex-1 bg-gray-900 rounded-lg p-2 text-white outline-none border border-gray-600" placeholder="Сообщение..."/>
-                                        <button onClick={sendMsg} className="bg-blue-600 w-10 h-10 rounded-lg text-white flex items-center justify-center"><i className="fas fa-paper-plane"></i></button>
-                                    </div>
-                                </>
-                            )}
                         </div>
                     </div>
                 );
-            };
+            }
 
-            const AdminSupport = ({ onClose }) => {
-                const [tickets, setTickets] = useState([]);
-                const [activeTicket, setActiveTicket] = useState(null);
-                const [msgs, setMsgs] = useState([]);
-                const [input, setInput] = useState("");
-                const messagesEndRef = useRef(null);
-
-                useEffect(() => {
-                    const q = window.fs.query(window.fs.collection(window.db, "support_tickets"), window.fs.orderBy("updatedAt", "desc"));
-                    return window.fs.onSnapshot(q, (snap) => {
-                        setTickets(snap.docs.map(d => ({id:d.id, ...d.data()})));
-                    });
-                }, []);
-
-                useEffect(() => {
-                    if (activeTicket) {
-                        const q = window.fs.query(
-                            window.fs.collection(window.db, "support_tickets", activeTicket.id, "messages"),
-                            window.fs.orderBy("createdAt", "asc")
-                        );
-                        window.fs.updateDoc(window.fs.doc(window.db, "support_tickets", activeTicket.id), { hasUnreadAdmin: false });
-                        
-                        return window.fs.onSnapshot(q, (snap) => {
-                            setMsgs(snap.docs.map(d => d.data()));
-                            setTimeout(() => messagesEndRef.current?.scrollIntoView({behavior:"smooth"}), 100);
-                        });
-                    }
-                }, [activeTicket]);
-
-                const sendReply = async () => {
-                    if (!input.trim() || !activeTicket) return;
-                    
-                    const batch = window.fs.writeBatch(window.db);
-                    const ticketRef = window.fs.doc(window.db, "support_tickets", activeTicket.id);
-                    
-                    batch.update(ticketRef, { updatedAt: window.fs.serverTimestamp() });
-                    batch.set(window.fs.doc(window.fs.collection(window.db, "support_tickets", activeTicket.id, "messages")), {
-                        sender: "admin", text: input, createdAt: window.fs.serverTimestamp()
-                    });
-                    batch.update(window.fs.doc(window.db, "users", activeTicket.userId.toString()), {
-                        notification: { type: 'support', text: `Ответ поддержки: ${input}` }
-                    });
-                    
-                    await batch.commit();
-                    setInput("");
-                };
-
-                return (
-                    <div className="fixed inset-0 bg-[#17212b] z-50 flex flex-col page-enter">
-                        <div className="h-[60px] bg-[#1c2936] flex items-center px-4 border-b border-gray-800 shrink-0 justify-between">
-                            <h2 className="font-bold text-white">{activeTicket ? activeTicket.userName : "Обращения"}</h2>
-                            <button onClick={activeTicket ? ()=>setActiveTicket(null) : onClose} className="text-gray-400">
-                                {activeTicket ? "Назад" : <i className="fas fa-times"></i>}
-                            </button>
-                        </div>
-
-                        {!activeTicket ? (
-                            <div className="flex-1 overflow-y-auto p-2 space-y-2">
-                                {tickets.map(t => (
-                                    <div key={t.id} onClick={()=>setActiveTicket(t)} className={`bg-gray-800 p-3 rounded-xl border border-gray-700 cursor-pointer ${t.hasUnreadAdmin ? 'border-l-4 border-l-red-500' : ''}`}>
-                                        <div className="flex justify-between">
-                                            <span className="font-bold text-white">{t.userName}</span>
-                                            <span className={`text-xs ${t.status==='open'?'text-green-400':'text-gray-500'}`}>{t.status}</span>
-                                        </div>
-                                        <div className="text-xs text-gray-500 mt-1">{t.updatedAt?.toDate().toLocaleString()}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        ) : (
-                            <>
-                                <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#17212b]">
-                                    {msgs.map((m, i) => (
-                                        <div key={i} className={`message-bubble ${m.sender==='admin'?'support-user':'support-admin'}`}>
-                                            {m.text}
-                                        </div>
-                                    ))}
-                                    <div ref={messagesEndRef}></div>
-                                </div>
-                                <div className="p-3 bg-[#233040] flex gap-2">
-                                    <input value={input} onChange={e=>setInput(e.target.value)} className="flex-1 bg-gray-900 rounded-lg p-2 text-white outline-none border border-gray-600" placeholder="Ответ..."/>
-                                    <button onClick={sendReply} className="bg-blue-600 w-10 h-10 rounded-lg text-white flex items-center justify-center"><i className="fas fa-paper-plane"></i></button>
-                                </div>
-                            </>
-                        )}
+            return (
+                <div className="modal-overlay" onClick={() => setSupportModalOpen(false)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-lg font-bold text-white mb-2">Написать в поддержку</h3>
+                        <textarea value={msg} onChange={e=>setMsg(e.target.value)} className="w-full bg-gray-900 text-white rounded p-3 h-32 border border-gray-600 mb-4 text-sm" placeholder="Опишите вашу проблему..."></textarea>
+                        <button onClick={() => sendSupportMessage(msg, supportModalOpen.chatId)} className="w-full bg-blue-600 text-white py-2 rounded-xl font-bold mb-2">Отправить</button>
+                        <button onClick={() => setSupportModalOpen(false)} className="w-full text-gray-400">Отмена</button>
                     </div>
-                );
-            };
+                </div>
+            );
+        };
 
-            const HistoryModal = () => {
-                if (!historyModalUser) return null;
-                const [txs, setTxs] = useState([]);
-                const [hTab, setHTab] = useState('spent'); 
-                useEffect(() => {
-                    const q = window.fs.query(window.fs.collection(window.db, "users", historyModalUser.id.toString(), "transactions"), window.fs.orderBy('createdAt', 'desc'));
-                    return window.fs.onSnapshot(q, (snap) => setTxs(snap.docs.map(d => ({id:d.id, ...d.data()}))));
-                }, [historyModalUser]);
-                const filtered = txs.filter(t => {
-                    if (hTab === 'spent') return t.type === 'spend';
-                    if (hTab === 'bonus') return t.type === 'bonus';
-                    if (hTab === 'purchase') return t.type === 'purchase';
-                    return true;
+        const AdminSupport = ({ onClose }) => {
+            const [tab, setTab] = useState('new');
+            const [tickets, setTickets] = useState([]);
+            const [replyText, setReplyText] = useState("");
+            const [activeTicket, setActiveTicket] = useState(null);
+
+            useEffect(() => {
+                const q = window.fs.query(
+                    window.fs.collection(window.db, "feedback"),
+                    window.fs.orderBy('createdAt', 'desc')
+                );
+                const unsub = window.fs.onSnapshot(q, (snap) => {
+                    setTickets(snap.docs.map(d => ({id:d.id, ...d.data()})));
                 });
-                return (
-                    <div className="modal-overlay" onClick={() => setHistoryModalUser(null)}>
-                        <div className="modal-content w-full h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
-                            <div className="flex justify-between items-center mb-4 border-b border-gray-700 pb-2"><h3 className="font-bold text-white text-lg">{historyModalUser.firstName}</h3><button onClick={() => setHistoryModalUser(null)} className="text-gray-400"><i className="fas fa-times"></i></button></div>
-                            <div className="flex bg-gray-900 rounded-lg p-1 mb-4 shrink-0"><button onClick={()=>setHTab('spent')} className={`tab-btn ${hTab==='spent'?'active':''}`}>Потрачено</button><button onClick={()=>setHTab('bonus')} className={`tab-btn ${hTab==='bonus'?'active':''}`}>Бонусы</button><button onClick={()=>setHTab('purchase')} className={`tab-btn ${hTab==='purchase'?'active':''}`}>Куплено</button></div>
-                            <div className="flex-1 overflow-y-auto text-left space-y-2">
-                                {filtered.length === 0 && <div className="text-gray-500 text-center text-sm mt-4">Пусто</div>}
-                                {filtered.map(t => (
-                                    <div key={t.id} className="bg-gray-800 p-3 rounded-xl border border-gray-700 text-sm">
-                                        <div className="flex justify-between mb-1"><span className="text-white font-bold">{t.description || 'Операция'}</span><span className={`font-mono ${t.type==='spend'?'text-red-400':'text-green-400'}`}>{t.type==='spend'?'-':'+'}{t.amount} т.</span></div>
-                                        <div className="flex justify-between text-xs text-gray-500"><span>{t.dateStr}</span>{t.amountRub > 0 && <span className="text-yellow-500">{t.amountRub} ₽</span>}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                );
+                return () => unsub();
+            }, []);
+
+            const filtered = tickets.filter(t => tab === 'new' ? t.status === 'new' : t.status !== 'new');
+
+            const sendReply = async (ticket) => {
+                if(!replyText.trim()) return;
+                
+                const batch = window.fs.writeBatch(window.db);
+                // Обновляем тикет
+                batch.update(window.fs.doc(window.db, "feedback", ticket.id), {
+                    status: "replied",
+                    reply: replyText,
+                    repliedAt: window.fs.serverTimestamp()
+                });
+                // Уведомляем юзера
+                batch.update(window.fs.doc(window.db, "users", ticket.userId.toString()), {
+                    notification: `💬 Ответ поддержки: ${replyText}`
+                });
+                
+                await batch.commit();
+                window.Telegram.WebApp.showAlert("Ответ отправлен");
+                setReplyText("");
+                setActiveTicket(null);
             };
 
-            // --- MAIN TABS ---
-            const TabGenerate = () => {
-                const [prompt, setPrompt] = useState('');
-                const [isProc, setIsProc] = useState(false);
-                const go = async () => {
-                    if (!prompt) return;
-                    if (!(await handleSpend(genType === 'image' ? config.priceImage : config.priceVideo, `Генерация ${genType}`))) return;
-                    setIsProc(true);
-                    setTimeout(async () => {
-                        const newUrl = genType === 'image' ? `https://placehold.co/600x600/1a1a1a/FFF.png?text=${encodeURIComponent(prompt)}` : "https://www.w3schools.com/html/mov_bbb.mp4";
-                        await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "history"), {
-                            type: genType, url: newUrl, prompt: prompt, date: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}), createdAt: window.fs.serverTimestamp()
-                        });
-                        setIsProc(false); setPrompt(''); window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    }, 2000);
-                };
-                const list = globalHistory.filter(item => item.type === genType);
-                return (
-                    <div className="page-enter p-5 pb-24">
-                        <div className="flex justify-between mb-4"><span className="text-gray-400">Баланс: <b className="text-yellow-400">{user.id === ADMIN_ID ? '∞' : dbUser.balance}</b></span></div>
-                        <div className="flex bg-gray-800 rounded-lg p-1 mb-4"><button onClick={() => setGenType('image')} className={`flex-1 py-2 rounded font-bold text-sm ${genType === 'image' ? 'bg-blue-600' : 'text-gray-500'}`}>Изображение ({config.priceImage})</button><button onClick={() => setGenType('video')} className={`flex-1 py-2 rounded font-bold text-sm ${genType === 'video' ? 'bg-purple-600' : 'text-gray-500'}`}>Видео ({config.priceVideo})</button></div>
-                        <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={`Опиши ${genType}...`} className="w-full bg-gray-800 rounded-xl p-4 mb-4 text-white min-h-[100px] border border-gray-700 outline-none"></textarea>
-                        <button onClick={go} disabled={isProc} className={`w-full py-3 rounded-xl font-bold ${genType === 'image' ? 'bg-blue-600' : 'bg-purple-600'}`}>{isProc ? <i className="fas fa-spinner fa-spin"></i> : "🚀 Сгенерировать"}</button>
-                        <div className="mt-6 space-y-4">
-                            <div className="flex justify-between items-center pl-1 mb-2"><h3 className="text-gray-400 text-sm font-bold">История:</h3>{list.length > 0 && <button onClick={clearAllHistory} className="text-red-400 text-xs font-bold bg-red-900/20 px-3 py-1 rounded">Очистить всё</button>}</div>
-                            {list.length === 0 && <div className="text-center text-gray-500 text-sm py-4">Пусто</div>}
-                            {list.map(item => (
-                                <div key={item.id} className="media-card slide-down">
-                                    <div className="delete-btn" onClick={(e) => deleteMedia(e, item.id)}><i className="fas fa-times"></i></div>
-                                    <div className="p-3 bg-[#233040] border-b border-[#2b3c4e] flex justify-between"><span className="text-xs text-gray-400 truncate">{item.prompt}</span><span className="text-[10px] text-gray-500">{item.date}</span></div>
-                                    <div className="bg-black flex justify-center items-center min-h-[200px] relative" 
-                                         onTouchStart={() => handleTouchStart(item)} onTouchEnd={handleTouchEnd} onContextMenu={e => e.preventDefault()} onClick={() => setFullscreenItem(item)}>
-                                        {item.type === 'image' ? <img src={item.url} className="max-w-full max-h-[400px]" /> : <><video src={item.url} controls className="max-w-full max-h-[400px]" /><div className="play-overlay"><i className="fas fa-play-circle"></i></div></>}
-                                    </div>
-                                    <div className="media-actions">
-                                        <button onClick={(e) => { handleDownload(e, item.url); setFullscreenItem(item); }} className="media-btn border-r border-[#2b3c4e]"><i className="fas fa-expand mr-2"></i> Скачать</button>
-                                        <button onClick={() => setShareModalItem(item)} className="media-btn"><i className="fas fa-share-nodes mr-2"></i> Поделиться</button>
-                                    </div>
+            return (
+                <div className="fixed inset-0 bg-[#17212b] z-50 flex flex-col page-enter">
+                    <div className="h-[60px] bg-[#1c2936] flex items-center px-4 border-b border-gray-800 shrink-0 justify-between">
+                        <h2 className="font-bold text-white">Обращения</h2>
+                        <button onClick={onClose} className="text-gray-400"><i className="fas fa-times"></i></button>
+                    </div>
+                    <div className="p-2 flex gap-2">
+                        <button onClick={()=>setTab('new')} className={`flex-1 py-2 rounded text-sm font-bold ${tab==='new'?'bg-blue-600 text-white':'bg-gray-800 text-gray-400'}`}>Новые</button>
+                        <button onClick={()=>setTab('archive')} className={`flex-1 py-2 rounded text-sm font-bold ${tab==='archive'?'bg-blue-600 text-white':'bg-gray-800 text-gray-400'}`}>Архив</button>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-2 space-y-2">
+                        {filtered.length === 0 && <div className="text-center text-gray-500 mt-10">Нет обращений</div>}
+                        {filtered.map(t => (
+                            <div key={t.id} className="bg-gray-800 p-3 rounded-xl border border-gray-700">
+                                <div className="flex justify-between mb-2">
+                                    <span className="text-blue-400 font-bold text-xs">{t.userName} (ID: {t.userId})</span>
+                                    <span className="text-gray-500 text-[10px]">{t.createdAt?.toDate().toLocaleDateString()}</span>
                                 </div>
-                            ))}
-                        </div>
+                                <p className="text-white text-sm mb-2">{t.text}</p>
+                                
+                                {t.status === 'new' ? (
+                                    activeTicket === t.id ? (
+                                        <div className="mt-2">
+                                            <textarea value={replyText} onChange={e=>setReplyText(e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white text-sm border border-gray-600 mb-2" placeholder="Ваш ответ..."></textarea>
+                                            <div className="flex gap-2">
+                                                <button onClick={()=>sendReply(t)} className="bg-green-600 px-3 py-1 rounded text-white text-xs">Отправить</button>
+                                                <button onClick={()=>setActiveTicket(null)} className="bg-gray-700 px-3 py-1 rounded text-white text-xs">Отмена</button>
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <button onClick={()=>setActiveTicket(t.id)} className="bg-blue-600 px-3 py-1 rounded text-white text-xs mt-2">Ответить</button>
+                                    )
+                                ) : (
+                                    <div className="mt-2 pt-2 border-t border-gray-700">
+                                        <p className="text-xs text-gray-400">Ваш ответ:</p>
+                                        <p className="text-green-400 text-sm">{t.reply}</p>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
                     </div>
-                );
+                </div>
+            );
+        };
+
+        const TabGenerate = () => {
+            const [prompt, setPrompt] = useState('');
+            const [isProc, setIsProc] = useState(false);
+
+            const go = async () => {
+                if (!prompt) return;
+                if (!(await handleSpend(genType === 'image' ? config.priceImage : config.priceVideo, `Генерация ${genType}`))) return;
+
+                setIsProc(true);
+                setTimeout(async () => {
+                    const { addDoc, collection, serverTimestamp } = window.fs;
+                    const newUrl = genType === 'image' 
+                        ? `https://placehold.co/600x600/1a1a1a/FFF.png?text=${encodeURIComponent(prompt)}` 
+                        : "https://www.w3schools.com/html/mov_bbb.mp4";
+                    
+                    await addDoc(collection(window.db, "users", user.id.toString(), "history"), {
+                        type: genType, url: newUrl, prompt: prompt,
+                        date: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}),
+                        createdAt: serverTimestamp() 
+                    });
+                    
+                    setIsProc(false);
+                    setPrompt('');
+                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }, 2000);
             };
 
-            const TabChat = () => {
-                const [chatId, setChatId] = useState(null);
-                const [chatList, setChatList] = useState([]);
-                const [msgs, setMsgs] = useState([]);
-                const [txt, setTxt] = useState('');
-                const endRef = useRef(null);
+            const list = globalHistory.filter(item => item.type === genType);
 
-                // Загрузка чатов
-                useEffect(() => {
-                    if (!user) return;
-                    const q = window.fs.query(
-                        window.fs.collection(window.db, "users", user.id.toString(), "chats"),
-                        window.fs.orderBy('createdAt', 'desc')
-                    );
-                    return window.fs.onSnapshot(q, (snap) => {
-                        setChatList(snap.docs.map(d => ({id:d.id, ...d.data()})));
-                    });
-                }, [user]);
-
-                // Загрузка сообщений
-                useEffect(() => {
-                    if (!chatId || !user) return;
-                    const q = window.fs.query(
-                        window.fs.collection(window.db, "users", user.id.toString(), "chats", chatId, "messages"),
-                        window.fs.orderBy('createdAt', 'asc')
-                    );
-                    return window.fs.onSnapshot(q, (snap) => {
-                        setMsgs(snap.docs.map(d => d.data()));
-                        setTimeout(() => endRef.current?.scrollIntoView({behavior:"smooth"}), 100);
-                    });
-                }, [chatId, user]);
-
-                const createChat = async () => {
-                    const ref = await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats"), {
-                        title: "Новый чат", createdAt: window.fs.serverTimestamp()
-                    });
-                    setChatId(ref.id);
-                };
-
-                const deleteChat = async (e, id) => {
-                    e.stopPropagation();
-                    if(!confirm("Удалить?")) return;
-                    await window.fs.deleteDoc(window.fs.doc(window.db, "users", user.id.toString(), "chats", id));
-                    if(chatId === id) setChatId(null);
-                };
-
-                const send = async () => {
-                    if (!txt.trim()) return;
-                    if (!(await handleSpend(config.priceText, 'Чат с ботом'))) return;
+            return (
+                <div className="page-enter p-5 pb-24">
+                    <div className="flex justify-between mb-4">
+                        <span className="text-gray-400">Баланс: <b className="text-yellow-400">{user.id === ADMIN_ID ? '∞' : dbUser.balance}</b></span>
+                    </div>
+                    <div className="flex bg-gray-800 rounded-lg p-1 mb-4">
+                        <button onClick={() => setGenType('image')} className={`flex-1 py-2 rounded font-bold text-sm ${genType === 'image' ? 'bg-blue-600' : 'text-gray-500'}`}>Изображение ({config.priceImage})</button>
+                        <button onClick={() => setGenType('video')} className={`flex-1 py-2 rounded font-bold text-sm ${genType === 'video' ? 'bg-purple-600' : 'text-gray-500'}`}>Видео ({config.priceVideo})</button>
+                    </div>
+                    <textarea value={prompt} onChange={e => setPrompt(e.target.value)} placeholder={`Опиши ${genType === 'image' ? 'картинку' : 'видео'}...`} className="w-full bg-gray-800 rounded-xl p-4 mb-4 text-white min-h-[100px] border border-gray-700 outline-none"></textarea>
+                    <button onClick={go} disabled={isProc} className={`w-full py-3 rounded-xl font-bold ${genType === 'image' ? 'bg-blue-600' : 'bg-purple-600'}`}>
+                        {isProc ? <i className="fas fa-spinner fa-spin"></i> : "🚀 Сгенерировать"}
+                    </button>
                     
-                    let cid = chatId;
-                    if (!cid) { // Если чата нет, создаем на лету
-                        const ref = await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats"), {
-                            title: txt.slice(0, 20) + "...", createdAt: window.fs.serverTimestamp()
-                        });
-                        cid = ref.id;
-                        setChatId(cid);
-                    }
-
-                    await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
-                        role: 'user', text: txt, createdAt: window.fs.serverTimestamp()
-                    });
-                    
-                    const userMsg = txt;
-                    setTxt('');
-
-                    // Имитация ответа
-                    setTimeout(() => {
-                        window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
-                            role: 'ai', text: "Ответ на: " + userMsg, createdAt: window.fs.serverTimestamp()
-                        });
-                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
-                    }, 1000);
-                };
-
-                if (!chatId) {
-                    return (
-                        <div className="page-enter p-4 pb-24">
-                            <button onClick={createChat} className="w-full py-4 rounded-xl bg-blue-600 font-bold text-white shadow-lg mb-6 flex items-center justify-center gap-2 active:scale-95 transition">
-                                <i className="fas fa-plus"></i> Новый чат
-                            </button>
-                            <h3 className="text-gray-400 text-sm font-bold mb-3 pl-1">Ваши диалоги:</h3>
-                            {chatList.length === 0 && <div className="text-center text-gray-500 mt-10">Нет диалогов</div>}
-                            <div className="space-y-2">
-                                {chatList.map(c => (
-                                    <div key={c.id} onClick={() => setChatId(c.id)} className="chat-item flex justify-between items-center group">
-                                        <div className="truncate text-white text-sm font-medium pl-2">{c.title}</div>
-                                        <button onClick={(e) => deleteChat(e, c.id)} className="p-2 text-gray-500"><i className="fas fa-trash"></i></button>
-                                    </div>
-                                ))}
-                            </div>
+                    <div className="mt-6 space-y-4">
+                        <div className="flex justify-between items-center pl-1 mb-2">
+                            <h3 className="text-gray-400 text-sm font-bold">История:</h3>
+                            {list.length > 0 && <button onClick={clearAllHistory} className="text-red-400 text-xs font-bold bg-red-900/20 px-3 py-1 rounded">Очистить всё</button>}
                         </div>
-                    );
+                        
+                        {list.length === 0 && <div className="text-center text-gray-500 text-sm py-4">Пусто</div>}
+                        
+                        {list.map(item => (
+                            <div key={item.id} className="media-card slide-down">
+                                <div className="delete-btn" onClick={(e) => deleteMedia(e, item.id)}><i className="fas fa-times"></i></div>
+                                <div className="p-3 bg-[#233040] border-b border-[#2b3c4e] flex justify-between"><span className="text-xs text-gray-400 truncate">{item.prompt}</span><span className="text-[10px] text-gray-500">{item.date}</span></div>
+                                <div className="bg-black flex justify-center items-center min-h-[200px] relative" 
+                                     onTouchStart={() => handleTouchStart(item)} onTouchEnd={handleTouchEnd} onContextMenu={e => e.preventDefault()} onClick={() => setFullscreenItem(item)}>
+                                    {item.type === 'image' ? <img src={item.url} className="max-w-full max-h-[400px]" /> : <video src={item.url} controls className="max-w-full max-h-[400px]" />}
+                                </div>
+                                <div className="media-actions">
+                                    <button onClick={(e) => { handleDownload(e, item.url); setFullscreenItem(item); }} className="media-btn border-r border-[#2b3c4e]"><i className="fas fa-expand mr-2"></i> Скачать</button>
+                                    <button onClick={() => setShareModalItem(item)} className="media-btn"><i className="fas fa-share-nodes mr-2"></i> Поделиться</button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            );
+        };
+
+        const TabChat = () => {
+            const [chatId, setChatId] = useState(null);
+            const [chatList, setChatList] = useState([]);
+            const [msgs, setMsgs] = useState([]);
+            const [txt, setTxt] = useState('');
+            const endRef = useRef(null);
+
+            // Allow opening from outside via window.openChatId
+            useEffect(() => {
+                if (window.openChatId) {
+                    setChatId(window.openChatId);
+                    window.openChatId = null;
+                }
+            }, []);
+
+            // Загрузка чатов
+            useEffect(() => {
+                if (!user) return;
+                const q = window.fs.query(
+                    window.fs.collection(window.db, "users", user.id.toString(), "chats"),
+                    window.fs.orderBy('createdAt', 'desc')
+                );
+                return window.fs.onSnapshot(q, (snap) => {
+                    setChatList(snap.docs.map(d => ({id:d.id, ...d.data()})));
+                });
+            }, [user]);
+
+            // Загрузка сообщений
+            useEffect(() => {
+                if (!chatId || !user) return;
+                const q = window.fs.query(
+                    window.fs.collection(window.db, "users", user.id.toString(), "chats", chatId, "messages"),
+                    window.fs.orderBy('createdAt', 'asc')
+                );
+                return window.fs.onSnapshot(q, (snap) => {
+                    setMsgs(snap.docs.map(d => d.data()));
+                    setTimeout(() => endRef.current?.scrollIntoView({behavior:"smooth"}), 100);
+                });
+            }, [chatId, user]);
+
+            const createChat = async () => {
+                const ref = await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats"), {
+                    title: "Новый чат", createdAt: window.fs.serverTimestamp()
+                });
+                setChatId(ref.id);
+            };
+
+            const deleteChat = async (e, id) => {
+                e.stopPropagation();
+                if(!confirm("Удалить?")) return;
+                await window.fs.deleteDoc(window.fs.doc(window.db, "users", user.id.toString(), "chats", id));
+                if(chatId === id) setChatId(null);
+            };
+
+            const send = async () => {
+                if (!txt.trim()) return;
+                if (!(await handleSpend(config.priceText, 'Чат с ботом'))) return;
+                
+                let cid = chatId;
+                if (!cid) { // Если чата нет, создаем на лету
+                    const ref = await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats"), {
+                        title: txt.slice(0, 20) + "...", createdAt: window.fs.serverTimestamp()
+                    });
+                    cid = ref.id;
+                    setChatId(cid);
                 }
 
-                return (
-                    <div className="page-enter flex flex-col h-screen fixed inset-0 z-50 bg-[#17212b]">
-                        <div className="h-[60px] bg-[#1c2936] flex items-center px-4 border-b border-gray-800 shrink-0">
-                             <button onClick={() => setChatId(null)} className="text-blue-500 font-medium flex gap-2"><i className="fas fa-chevron-left"></i> Назад</button>
-                        </div>
-                         <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-[80px]">
-                            {msgs.map((m,i) => <div key={i} className={`message-bubble ${m.role==='user'?'user-msg ml-auto':'ai-msg'}`}>{m.text}</div>)}
-                            <div ref={endRef} />
-                        </div>
-                        <div className="chat-input-area flex items-center gap-2 pb-safe bg-[#17212b] border-t border-gray-800">
-                            <input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Сообщение..." className="flex-1 bg-gray-800 text-white rounded-full px-4 py-3 border border-gray-600 outline-none focus:border-blue-500"/>
-                            <button onClick={send} className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg"><i className="fas fa-paper-plane"></i></button>
-                        </div>
-                    </div>
-                );
+                await window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
+                    role: 'user', text: txt, createdAt: window.fs.serverTimestamp()
+                });
+                
+                const userMsg = txt;
+                setTxt('');
+
+                // Имитация ответа
+                setTimeout(() => {
+                    window.fs.addDoc(window.fs.collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
+                        role: 'ai', text: "Ответ на: " + userMsg, createdAt: window.fs.serverTimestamp()
+                    });
+                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                }, 1000);
             };
 
-            const TabProfile = () => {
-                const [buyV, setBuyV] = useState(100);
-                const baseUrl = config.referralBaseUrl || DEFAULT_BASE_URL;
-                const link = `${baseUrl}?start=${user?.id}`;
-
-                const handleBuy = (amt, price, name) => setPayModalData({ name, tokens: amt, price });
-                
-                const copyLink = () => {
-                    navigator.clipboard.writeText(link);
-                    window.Telegram.WebApp.showAlert("Скопировано!");
-                };
-
-                if (!user) return <div className="p-10 text-center text-white">Загрузка...</div>;
-
+            if (!chatId) {
                 return (
-                    <div className="page-enter p-5 pb-24">
-                        <div className="bg-gray-800 rounded-2xl p-6 mb-4 border border-gray-700 cursor-pointer" onClick={() => setHistoryModalUser(user)}>
-                            <div className="flex justify-between items-start mb-2">
-                                <div><h2 className="text-2xl font-bold text-white">{user.first_name}</h2><p className="text-gray-400 text-sm">ID: {user.id}</p></div>
-                                <div className="text-right">
-                                    <span className="block text-4xl font-bold text-yellow-400">{user.id===ADMIN_ID ? '∞' : dbUser.balance}</span>
-                                    <span className="text-xs text-gray-400 uppercase">Токенов (нажми)</span>
-                                </div>
-                            </div>
-                            <div className="flex gap-2 mt-2">
-                                {user.id === ADMIN_ID && <button onClick={(e) => {e.stopPropagation(); setActiveTab('admin');}} className="flex-1 bg-gray-700 py-2 rounded-xl text-sm border border-gray-600 text-white">Админка</button>}
-                                <button onClick={(e) => {e.stopPropagation(); setSupportModalOpen(true);}} className="flex-1 bg-blue-900/50 py-2 rounded-xl text-sm border border-blue-800 text-blue-300">🆘 Поддержка</button>
-                            </div>
-                        </div>
-
-                        <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
-                            <h3 className="font-bold text-lg mb-2 text-white">🎁 Пригласи друга</h3>
-                            <p className="text-sm text-gray-300 mb-4">Награда: {config.referralReward} т.</p>
-                            <button onClick={copyLink} className="bg-blue-600 px-4 py-3 rounded-lg font-bold text-sm text-white w-full mb-3">Скопировать ссылку</button>
-                            <div className="bg-black/40 p-3 rounded-lg overflow-hidden text-center"><p className="text-xs text-gray-400 truncate">{link}</p></div>
-                        </div>
-
-                        <div className="grid gap-3 mb-6">
-                            {(config.tariffs || []).map(t => (
-                                <div key={t.id} onClick={() => handleBuy(t.tokens, t.price, t.name)} className="tariff-card rounded-xl p-4 flex justify-between items-center">
-                                    <div className="flex items-center">
-                                        <div className="bg-blue-600/20 text-blue-400 w-10 h-10 rounded-full flex items-center justify-center mr-3"><i className="fas fa-bolt"></i></div>
-                                        <div><div className="font-bold text-base text-white">{t.name}</div><div className="text-gray-400 text-xs">{t.tokens} т.</div></div>
-                                    </div>
-                                    <div className="bg-blue-600 px-3 py-1.5 rounded-lg font-bold text-sm text-white">{t.price} ₽</div>
+                    <div className="page-enter p-4 pb-24">
+                        <button onClick={createChat} className="w-full py-4 rounded-xl bg-blue-600 font-bold text-white shadow-lg mb-6 flex items-center justify-center gap-2 active:scale-95 transition">
+                            <i className="fas fa-plus"></i> Новый чат
+                        </button>
+                        <h3 className="text-gray-400 text-sm font-bold mb-3 pl-1">Ваши диалоги:</h3>
+                        {chatList.length === 0 && <div className="text-center text-gray-500 mt-10">Нет диалогов</div>}
+                        <div className="space-y-2">
+                            {chatList.map(c => (
+                                <div key={c.id} onClick={() => setChatId(c.id)} className="chat-item flex justify-between items-center group">
+                                    <div className="truncate text-white text-sm font-medium pl-2">{c.title}</div>
+                                    <button onClick={(e) => deleteChat(e, c.id)} className="p-2 text-gray-500"><i className="fas fa-trash"></i></button>
                                 </div>
                             ))}
                         </div>
-
-                         <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
-                            <h3 className="font-bold text-lg mb-3 text-white">Свой вариант</h3>
-                            <div className="mb-4 flex items-center bg-gray-900 rounded-xl border border-gray-600 overflow-hidden">
-                                <input type="number" value={buyV} onChange={e => setBuyV(Number(e.target.value))} className="flex-1 bg-transparent p-3 text-white outline-none"/>
-                                <span className="pr-4 text-gray-500 text-sm">шт.</span>
-                            </div>
-                            <button onClick={() => handleBuy(buyV, Math.ceil(buyV * config.tokenPriceRub), 'Пополнение')} className="w-full bg-green-600 py-3 rounded-xl font-bold text-white">Купить за {Math.ceil(buyV * config.tokenPriceRub)} ₽</button>
-                        </div>
                     </div>
                 );
-            };
+            }
 
-            const TabAdmin = () => {
-                const [sub, setSub] = useState('set'); 
-                const [lc, setLc] = useState(config);
-                const [stats, setStats] = useState({ u: 0, s: 0, r: 0, l: false, online: 0 });
-                const [filterPeriod, setFilterPeriod] = useState('all'); 
-                const [customStart, setCustomStart] = useState('');
-                const [customEnd, setCustomEnd] = useState('');
-                const [searchQuery, setSearchQuery] = useState('');
-                const [userResults, setUserResults] = useState([]);
-                const [selectedUsers, setSelectedUsers] = useState(new Set());
-                const [grantModal, setGrantModal] = useState(false);
-                const [gAmount, setGAmount] = useState('');
-                const [singleTarget, setSingleTarget] = useState(null);
-                const [adminSupportOpen, setAdminSupportOpen] = useState(false);
-                const [statusFilter, setStatusFilter] = useState('all');
-
-                const upd = (k, v) => setLc(p => ({...p, [k]: v}));
-                const save = () => saveConfigToDb(lc);
-
-                const updateTariff = (id, field, val) => setLc(p => ({...p, tariffs: p.tariffs.map(t => t.id===id?{...t, [field]:val}:t)}));
-                const addTariff = () => setLc(p => ({...p, tariffs: [...p.tariffs, {id: Date.now(), name:'New', tokens:100, price:100}]}));
-                const deleteTariff = (id) => confirm("Del?") && setLc(p => ({...p, tariffs: p.tariffs.filter(t => t.id!==id)}));
-
-                const toggleUser = (id) => {
-                    const newSet = new Set(selectedUsers);
-                    if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
-                    setSelectedUsers(newSet);
-                };
-
-                const toggleAll = () => {
-                    if (selectedUsers.size === userResults.length) setSelectedUsers(new Set());
-                    else setSelectedUsers(new Set(userResults.map(u => u.id)));
-                };
-
-                const executeGrant = async () => {
-                    if(!gAmount) return window.Telegram.WebApp.showAlert("Введите сумму");
-                    const amount = Number(gAmount);
-                    const targets = singleTarget ? [singleTarget] : userResults.filter(u => selectedUsers.has(u.id));
-                    
-                    if (targets.length === 0) return window.Telegram.WebApp.showAlert("Никто не выбран");
-                    
-                    const batchSize = 400; 
-                    const chunks = [];
-                    for (let i=0; i < targets.length; i+=batchSize) chunks.push(targets.slice(i, i+batchSize));
-
-                    let count = 0;
-                    for (const chunk of chunks) {
-                        const batch = window.fs.writeBatch(window.db);
-                        chunk.forEach(u => {
-                            const userRef = window.fs.doc(window.db, "users", u.id);
-                            const txRef = window.fs.doc(window.fs.collection(window.db, "users", u.id, "transactions"));
-                            
-                            batch.update(userRef, { 
-                                balance: window.fs.increment(amount),
-                                notification: { type: 'gift', text: `🎁 Вам начислено ${amount} бонусов!` } 
-                            });
-                            batch.set(txRef, {
-                                type: 'bonus', amount: amount, amountRub: 0, description: 'Подарок админа',
-                                createdAt: window.fs.serverTimestamp(), dateStr: new Date().toLocaleString()
-                            });
-                        });
-                        await batch.commit();
-                        count += chunk.length;
-                    }
-                    
-                    window.Telegram.WebApp.showAlert(`Успешно: ${count} юзеров!`);
-                    setGrantModal(false); setSingleTarget(null); setGAmount(''); setSelectedUsers(new Set());
-                };
-
-                const loadStats = async () => {
-                    setStats(p => ({...p, l: true}));
-                    const s = await window.fs.getDocs(window.fs.collection(window.db, "users"));
-                    
-                    let u=0, so=0, r=0, online=0, list=[];
-                    const q = searchQuery.toLowerCase();
-                    const now = new Date();
-                    const tenMinsAgo = new Date(now.getTime() - 10 * 60 * 1000);
-                    const fourDaysAgo = new Date(now.getTime() - 4 * 24 * 60 * 60 * 1000);
-
-                    s.forEach(d => { 
-                        const x = d.data();
-                        const regDate = new Date(x.createdAt || 0);
-                        const lastActive = x.lastActiveAt ? x.lastActiveAt.toDate() : new Date(0);
-                        
-                        // Статусы
-                        const isOnline = lastActive > tenMinsAgo;
-                        const isInactive = lastActive < fourDaysAgo;
-                        if (isOnline) online++;
-
-                        // Фильтр даты
-                        let includeDate = true;
-                        if (filterPeriod === 'today') includeDate = regDate.toDateString() === now.toDateString();
-                        else if (filterPeriod === 'week') includeDate = regDate >= new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-                        else if (filterPeriod === 'manual' && customStart && customEnd) {
-                            includeDate = regDate >= new Date(customStart) && regDate <= new Date(customEnd + 'T23:59:59');
-                        }
-
-                        if (includeDate) {
-                            u++; 
-                            so += (x.balance || 0); 
-                            r += (x.totalDonated || 0);
-                            
-                            // Фильтр поиска и статуса
-                            const matchesSearch = !searchQuery || x.firstName?.toLowerCase().includes(q) || d.id.includes(q);
-                            let matchesStatus = true;
-                            if (statusFilter === 'online') matchesStatus = isOnline;
-                            if (statusFilter === 'inactive') matchesStatus = isInactive;
-
-                            if (matchesSearch && matchesStatus) {
-                                list.push({id: d.id, ...x, isOnline, isInactive});
-                            }
-                        }
-                    });
-                    setStats({ u, sold: so, revenue: r, l: false, online });
-                    setUserResults(list);
-                };
-                
-                useEffect(() => { if(sub==='stat') loadStats(); }, [sub, filterPeriod, searchQuery, customStart, customEnd, statusFilter]);
-
-                return (
-                    <div className="page-enter p-5 pb-24">
-                        <div className="flex justify-between mb-4">
-                            <button onClick={() => setActiveTab('profile')} className="text-gray-400">Назад</button>
-                            <div className="bg-gray-800 rounded p-1 flex">
-                                <button onClick={() => setSub('set')} className={`px-3 py-1 rounded text-xs ${sub==='set'?'bg-blue-600':'text-gray-500'}`}>Настройки</button>
-                                <button onClick={() => setSub('stat')} className={`px-3 py-1 rounded text-xs ${sub==='stat'?'bg-purple-600':'text-gray-500'}`}>Статистика</button>
-                            </div>
-                        </div>
-                        
-                        <button onClick={()=>setAdminSupportOpen(true)} className="w-full bg-gray-800 border border-gray-700 text-white py-3 rounded-xl mb-4 flex justify-between px-4 items-center">
-                            <span>📩 Сообщения</span>
-                            {unreadSupportCount > 0 && <span className="msg-badge">{unreadSupportCount}</span>}
-                        </button>
-
-                        {sub === 'set' ? (
-                            <div className="space-y-4">
-                                <button onClick={save} className="w-full bg-blue-600 py-2 rounded font-bold text-white mb-2">Сохранить</button>
-                                {/* Настройки (код тот же) */}
-                                <div className="bg-gray-800 p-4 rounded-xl border border-gray-700"><h3 className="text-blue-400 font-bold mb-2 text-xs">🔗 Основные</h3><div className="mb-2"><label className="text-[10px] text-gray-400">Ссылка для приглашений</label><input value={lc.referralBaseUrl} onChange={e => upd('referralBaseUrl', e.target.value)} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div><div><label className="text-[10px] text-gray-400">Token BotFather</label><input value={lc.botToken} onChange={e => upd('botToken', e.target.value)} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div></div>
-                                {/* ... Остальные блоки настроек ... */}
-                            </div>
-                        ) : (
-                            <div className="space-y-4">
-                                {/* Фильтры даты */}
-                                <div className="flex gap-2 mb-4 overflow-x-auto pb-2"><button onClick={() => setFilterPeriod('all')} className={`px-3 py-1 rounded-full text-xs border ${filterPeriod==='all'?'bg-white text-black':'border-gray-600 text-gray-400'}`}>Все</button><button onClick={() => setFilterPeriod('today')} className={`px-3 py-1 rounded-full text-xs border ${filterPeriod==='today'?'bg-white text-black':'border-gray-600 text-gray-400'}`}>Сегодня</button><button onClick={() => setFilterPeriod('week')} className={`px-3 py-1 rounded-full text-xs border ${filterPeriod==='week'?'bg-white text-black':'border-gray-600 text-gray-400'}`}>Неделя</button><button onClick={() => setFilterPeriod('manual')} className={`px-3 py-1 rounded-full text-xs border ${filterPeriod==='manual'?'bg-white text-black':'border-gray-600 text-gray-400'}`}>Период</button></div>
-                                {filterPeriod === 'manual' && (<div className="bg-gray-800 p-3 rounded-xl border border-gray-700 mb-4 grid grid-cols-2 gap-2"><input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-full bg-gray-900 text-white text-xs p-2 rounded border border-gray-600"/><input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-full bg-gray-900 text-white text-xs p-2 rounded border border-gray-600"/></div>)}
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-gray-800 p-3 rounded-xl"><div className="text-gray-400 text-xs">Юзеров</div><div className="text-xl font-bold text-white">{stats.u}</div></div>
-                                    <div className="bg-gray-800 p-3 rounded-xl"><div className="text-gray-400 text-xs">Онлайн</div><div className="text-xl font-bold text-green-400">{stats.online}</div></div>
-                                    <div className="bg-gray-800 p-3 rounded-xl"><div className="text-gray-400 text-xs">Токенов</div><div className="text-xl font-bold text-blue-400">{stats.sold}</div></div>
-                                    <div className="bg-gray-800 p-3 rounded-xl"><div className="text-gray-400 text-xs">Выручка</div><div className="text-xl font-bold text-yellow-400">{stats.revenue} ₽</div></div>
-                                </div>
-                                
-                                <div className="mt-4">
-                                    <div className="flex justify-between items-center mb-2">
-                                        <div className="flex gap-2">
-                                            <button onClick={()=>setStatusFilter('all')} className={`text-[10px] px-2 py-1 rounded ${statusFilter==='all'?'bg-gray-600':'bg-gray-800'}`}>Все</button>
-                                            <button onClick={()=>setStatusFilter('online')} className={`text-[10px] px-2 py-1 rounded ${statusFilter==='online'?'bg-green-900 text-green-200':'bg-gray-800 text-green-500'}`}>Online</button>
-                                            <button onClick={()=>setStatusFilter('inactive')} className={`text-[10px] px-2 py-1 rounded ${statusFilter==='inactive'?'bg-yellow-900 text-yellow-200':'bg-gray-800 text-yellow-500'}`}>Inactive</button>
-                                        </div>
-                                        {selectedUsers.size > 0 && <button onClick={() => setGrantModal(true)} className="text-xs bg-pink-600 px-3 py-1 rounded text-white font-bold">Подарить ({selectedUsers.size})</button>}
-                                    </div>
-                                    <div className="flex gap-2 mb-2"><input placeholder="Поиск..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 bg-gray-900 rounded p-2 text-white border border-gray-700 text-xs"/><button onClick={toggleAll} className="bg-gray-700 px-3 rounded text-xs text-white">Все</button></div>
-                                    <div className="bg-gray-900 rounded-lg overflow-y-auto max-h-80 border border-gray-700">{userResults.map(u => (<div key={u.id} className="p-2 border-b border-gray-800 flex items-center gap-2 hover:bg-gray-800"><div className={`custom-checkbox ${selectedUsers.has(u.id)?'checked':''}`} onClick={() => toggleUser(u.id)}><i className="fas fa-check"></i></div><div className="flex-1 min-w-0" onClick={() => {setSingleTarget(u); setGrantModal(true);}}><div className="flex items-center"><span className={`status-dot ${u.isOnline?'status-green':(u.isInactive?'status-yellow':'status-gray')}`}></span><div className="text-white text-xs font-bold truncate">{u.firstName}</div></div><div className="text-gray-500 text-[10px] truncate">{u.id}</div></div><span className="text-yellow-500 text-xs">{u.balance}</span><button onClick={() => setHistoryModalUser(u)} className="text-blue-400 p-2"><i className="fas fa-book"></i></button></div>))}</div>
-                                </div>
-                            </div>
-                        )}
-                        {grantModal && <div className="modal-overlay" onClick={() => {setGrantModal(false); setSingleTarget(null);}}><div className="modal-content" onClick={e => e.stopPropagation()}><h3 className="text-lg font-bold text-white mb-2">{singleTarget ? `Бонус для ${singleTarget.firstName}` : `Рассылка для ${selectedUsers.size} чел.`}</h3><input type="number" placeholder="Сумма токенов" value={gAmount} onChange={e => setGAmount(e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-600 mb-4"/><button onClick={executeGrant} className="w-full bg-green-600 py-2 rounded text-white font-bold mb-2">Начислить</button><button onClick={() => {setGrantModal(false); setSingleTarget(null);}} className="w-full text-gray-400">Отмена</button></div></div>}
-                        {adminSupportOpen && <AdminSupport onClose={()=>setAdminSupportOpen(false)} />}
-                    </div>
-                );
-            };
-
-            const FullScreenModal = () => {if (!fullscreenItem) return null; return (<div className="modal-overlay" onClick={() => setFullscreenItem(null)}><div className="close-fs-btn" onClick={() => setFullscreenItem(null)}>&times;</div>{fullscreenItem.type === 'image' ? <img src={fullscreenItem.url} className="fullscreen-media" onClick={e => e.stopPropagation()} /> : <video src={fullscreenItem.url} controls autoPlay className="fullscreen-media" onClick={e => e.stopPropagation()} />}</div>);};
-            const PayModal = () => {if (!payModalData) return null; const { name, price, tokens } = payModalData; return (<div className="modal-overlay" onClick={() => setPayModalData(null)}><div className="modal-content" onClick={e => e.stopPropagation()}><h3 className="text-xl font-bold text-white mb-1">Оплата</h3><div className="text-blue-400 font-bold mb-4">{name}</div><div className="text-gray-400 text-sm mb-4">Вы получаете: <b className="text-white">{tokens} токенов</b></div><div className="bg-white p-2 rounded-xl mb-4 inline-block"><img src={config.qrUrl} alt="QR" className="w-40 h-40 object-contain"/></div><div className="text-center mb-4"><span className="text-2xl font-bold text-green-400">{price} ₽</span></div><a href={config.paymentLink} target="_blank" className="block w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 shadow-lg transform active:scale-95 transition">Перейти к оплате</a><button onClick={() => setPayModalData(null)} className="w-full text-gray-400 py-2">Отмена</button></div></div>);};
-            const ShareModal = () => {if (!shareModalItem) return null; const { url, prompt } = shareModalItem; return (<div className="modal-overlay" onClick={() => setShareModalItem(null)}><div className="modal-content" onClick={e => e.stopPropagation()}><h3 className="text-xl font-bold text-white mb-4">Поделиться</h3><div className="space-y-3"><button onClick={()=>{window.Telegram.WebApp.switchInlineQuery(prompt); setShareModalItem(null)}} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"><i className="fas fa-paper-plane"></i> В Telegram</button><button onClick={() => {if (navigator.share) navigator.share({ title: 'AI Bot', text: prompt, url: url }); else window.Telegram.WebApp.showAlert("Используйте копирование ссылки");}} className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2"><i className="fas fa-share-alt"></i> Системный</button><button onClick={()=>{navigator.clipboard.writeText(url); window.Telegram.WebApp.showAlert("Скопировано!"); setShareModalItem(null);}} className="w-full bg-gray-800 text-white py-3 rounded-xl font-bold flex items-center justify-center border border-gray-600 gap-2"><i className="fas fa-link"></i> Копия ссылки</button><button onClick={() => setShareModalItem(null)} className="w-full text-gray-400 py-2">Закрыть</button></div></div></div>);};
-
-            const NavItem = ({ id, icon, label }) => (<button onClick={() => setActiveTab(id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === id ? 'text-blue-500 scale-110' : 'text-gray-500'}`}><i className={`fas ${icon} text-xl mb-1`}></i><span className="text-[10px] font-medium">{label}</span></button>);
-
-            if (isLoading) return <div className="flex h-screen items-center justify-center text-blue-500"><i className="fas fa-circle-notch fa-spin text-2xl"></i></div>;
-            
             return (
-                <div className="min-h-screen bg-[#17212b]">
-                    {activeTab === 'generate' && <TabGenerate />}
-                    {activeTab === 'chat' && <TabChat />}
-                    {activeTab === 'profile' && <TabProfile />}
-                    {activeTab === 'admin' && <TabAdmin />}
-                    
-                    {/* Меню скрываем, если открыт конкретный чат */}
-                    {!(activeTab === 'chat' && document.querySelector('.chat-input-area')) && (
-                        <div className="fixed bottom-0 left-0 right-0 bg-[#1c2936] border-t border-gray-800 pb-safe pt-2 px-6 flex justify-around z-50 h-[70px]">
-                            <NavItem id="generate" icon="fa-wand-magic-sparkles" label="Имидж" />
-                            <NavItem id="chat" icon="fa-comments" label="Чат" />
-                            <NavItem id="profile" icon="fa-user-circle" label="Профиль" />
+                <div className="page-enter flex flex-col h-screen fixed inset-0 z-50 bg-[#17212b]">
+                    <div className="h-[60px] bg-[#1c2936] flex items-center px-4 border-b border-gray-800 shrink-0">
+                         <button onClick={() => setChatId(null)} className="text-blue-500 font-medium flex gap-2"><i className="fas fa-chevron-left"></i> Назад</button>
+                    </div>
+                     <div className="flex-1 overflow-y-auto p-4 space-y-3 pb-[80px]">
+                        {msgs.map((m,i) => <div key={i} className={`message-bubble ${m.role==='user'?'user-msg ml-auto':'ai-msg'}`}>{m.text}</div>)}
+                        <div ref={endRef} />
+                    </div>
+                    <div className="chat-input-area flex items-center gap-2 pb-safe bg-[#17212b] border-t border-gray-800">
+                        <input value={txt} onChange={e => setTxt(e.target.value)} placeholder="Сообщение..." className="flex-1 bg-gray-800 text-white rounded-full px-4 py-3 border border-gray-600 outline-none focus:border-blue-500"/>
+                        <button onClick={send} className="w-12 h-12 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg"><i className="fas fa-paper-plane"></i></button>
+                    </div>
+                </div>
+            );
+        };
+
+        const TabProfile = () => {
+            const [buyV, setBuyV] = useState(100);
+            const baseUrl = config.referralBaseUrl || DEFAULT_BASE_URL;
+            const link = `${baseUrl}?start=${user?.id}`;
+
+            const handleBuy = (amt, price, name) => setPayModalData({ name, tokens: amt, price });
+            
+            const copyLink = () => {
+                navigator.clipboard.writeText(link);
+                window.Telegram.WebApp.showAlert("Скопировано!");
+            };
+
+            if (!user) return <div className="p-10 text-center text-white">Загрузка...</div>;
+
+            return (
+                <div className="page-enter p-5 pb-24">
+                    <div className="bg-gray-800 rounded-2xl p-6 mb-4 border border-gray-700 cursor-pointer" onClick={() => setHistoryModalUser(user)}>
+                        <div className="flex justify-between items-start mb-2">
+                            <div><h2 className="text-2xl font-bold text-white">{user.first_name}</h2><p className="text-gray-400 text-sm">ID: {user.id}</p></div>
+                            <div className="text-right">
+                                <span className="block text-4xl font-bold text-yellow-400">{user.id===ADMIN_ID ? '∞' : dbUser.balance}</span>
+                                <span className="text-xs text-gray-400 uppercase">Токенов (нажми)</span>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 mt-2">
+                            {user.id === ADMIN_ID && <button onClick={(e) => {e.stopPropagation(); setActiveTab('admin');}} className="flex-1 bg-gray-700 py-2 rounded-xl text-sm border border-gray-600 text-white">Админка</button>}
+                            <button onClick={(e) => {e.stopPropagation(); handleSupportButton();}} className="flex-1 bg-blue-900/50 py-2 rounded-xl text-sm border border-blue-800 text-blue-300">🆘 Поддержка</button>
+                        </div>
+                    </div>
+
+                    <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
+                        <h3 className="text-lg font-bold mb-2 text-white">🎁 Пригласи друга</h3>
+                        <p className="text-sm text-gray-300 mb-4">Награда: {config.referralReward} т.</p>
+                        <button onClick={copyLink} className="bg-blue-600 px-4 py-3 rounded-lg font-bold text-sm text-white w-full mb-3">Скопировать ссылку</button>
+                        <div className="bg-black/40 p-3 rounded-lg overflow-hidden text-center"><p className="text-xs text-gray-400 truncate">{link}</p></div>
+                    </div>
+
+                    <h3 className="text-lg font-bold mb-3 pl-1 text-white">📦 Пакеты</h3>
+                    <div className="grid gap-3 mb-6">
+                        {(config.tariffs || []).map(t => (
+                            <div key={t.id} onClick={() => handleBuy(t.tokens, t.price, t.name)} className="tariff-card rounded-xl p-4 flex justify-between items-center">
+                                <div className="flex items-center">
+                                    <div className="bg-blue-600/20 text-blue-400 w-10 h-10 rounded-full flex items-center justify-center mr-3"><i className="fas fa-bolt"></i></div>
+                                    <div><div className="font-bold text-base text-white">{t.name}</div><div className="text-gray-400 text-xs">{t.tokens} т.</div></div>
+                                </div>
+                                <div className="bg-blue-600 px-3 py-1.5 rounded-lg font-bold text-sm text-white">{t.price} ₽</div>
+                            </div>
+                        ))}
+                    </div>
+
+                     <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
+                        <h3 className="font-bold text-lg mb-3 text-white">Свой вариант</h3>
+                        <div className="mb-4 flex items-center bg-gray-900 rounded-xl border border-gray-600 overflow-hidden">
+                            <input type="number" value={buyV} onChange={e => setBuyV(Number(e.target.value))} className="flex-1 bg-transparent p-3 text-white outline-none"/>
+                            <span className="pr-4 text-gray-500 text-sm">шт.</span>
+                        </div>
+                        <button onClick={() => handleBuy(buyV, Math.ceil(buyV * config.tokenPriceRub), 'Пополнение')} className="w-full bg-green-600 py-3 rounded-xl font-bold text-white">Купить за {Math.ceil(buyV * config.tokenPriceRub)} ₽</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const TabAdmin = () => {
+            const [sub, setSub] = useState('set'); 
+            const [lc, setLc] = useState(config);
+            const [stats, setStats] = useState({ u: 0, s: 0, r: 0, l: false });
+            const [filterPeriod, setFilterPeriod] = useState('all'); 
+            const [customStart, setCustomStart] = useState('');
+            const [customEnd, setCustomEnd] = useState('');
+            const [searchQuery, setSearchQuery] = useState('');
+            const [userResults, setUserResults] = useState([]);
+            const [selectedUsers, setSelectedUsers] = useState(new Set());
+            const [grantModal, setGrantModal] = useState(false); // Для массовой или одиночной рассылки
+            const [gAmount, setGAmount] = useState('');
+            const [singleTarget, setSingleTarget] = useState(null); // Если начисляем одному
+            const [adminSupportOpen, setAdminSupportOpen] = useState(false);
+            const [colorFilter, setColorFilter] = useState('all');
+            const [onlineCount, setOnlineCount] = useState(0);
+
+            useEffect(()=> setLc(config), [config]);
+
+            const upd = (k, v) => setLc(p => ({...p, [k]: v}));
+            const save = () => saveConfigToDb(lc);
+
+            // Тарифы
+            const updateTariff = (id, field, val) => setLc(p => ({...p, tariffs: p.tariffs.map(t => t.id===id?{...t, [field]:val}:t)}));
+            const addTariff = () => setLc(p => ({...p, tariffs: [...p.tariffs, {id: Date.now(), name:'New', tokens:100, price:100}]}));
+            const deleteTariff = (id) => confirm("Del?") && setLc(p => ({...p, tariffs: p.tariffs.filter(t => t.id!==id)}));
+
+            const toggleUser = (id) => {
+                const newSet = new Set(selectedUsers);
+                if (newSet.has(id)) newSet.delete(id); else newSet.add(id);
+                setSelectedUsers(newSet);
+            };
+
+            const toggleAll = () => {
+                if (selectedUsers.size === userResults.length) setSelectedUsers(new Set());
+                else setSelectedUsers(new Set(userResults.map(u => u.id)));
+            };
+
+            const executeGrant = async () => {
+                if(!gAmount) return window.Telegram.WebApp.showAlert("Введите сумму");
+                const amount = Number(gAmount);
+                const targets = singleTarget ? [singleTarget] : userResults.filter(u => selectedUsers.has(u.id));
+                
+                if (targets.length === 0) return window.Telegram.WebApp.showAlert("Никто не выбран");
+                
+                const batchSize = 400; 
+                const chunks = [];
+                for (let i=0; i < targets.length; i+=batchSize) chunks.push(targets.slice(i, i+batchSize));
+
+                let count = 0;
+                for (const chunk of chunks) {
+                    const batch = window.fs.writeBatch(window.db);
+                    chunk.forEach(u => {
+                        const userRef = window.fs.doc(window.db, "users", u.id);
+                        const txRef = window.fs.doc(window.fs.collection(window.db, "users", u.id, "transactions"));
+                        
+                        batch.update(userRef, { 
+                            balance: window.fs.increment(amount),
+                            notification: `🎁 Вам начислено ${amount} бонусов!` 
+                        });
+                        batch.set(txRef, {
+                            type: 'bonus', amount: amount, amountRub: 0, description: 'Подарок админа',
+                            createdAt: window.fs.serverTimestamp(), dateStr: new Date().toLocaleString()
+                        });
+                    });
+                    await batch.commit();
+                    count += chunk.length;
+                }
+                
+                window.Telegram.WebApp.showAlert(`Успешно: ${count} юзеров!`);
+                setGrantModal(false); setSingleTarget(null); setGAmount(''); setSelectedUsers(new Set());
+            };
+
+            const loadStats = async () => {
+                setStats(p => ({...p, l: true}));
+                const s = await window.fs.getDocs(window.fs.collection(window.db, "users"));
+                let u=0, so=0, r=0, list=[];
+                const q = searchQuery.toLowerCase();
+                const now = new Date();
+
+                s.forEach(d => { 
+                    const x = d.data();
+                    const regDate = new Date(x.createdAt || 0);
+                    let include = true;
+                    if (filterPeriod === 'today') include = regDate.toDateString() === now.toDateString();
+                    else if (filterPeriod === 'week') include = regDate >= new Date(now.getTime() - 7*86400000);
+                    else if (filterPeriod === 'manual' && customStart && customEnd) {
+                        include = regDate >= new Date(customStart) && regDate <= new Date(customEnd + 'T23:59:59');
+                    }
+
+                    if (include) {
+                        u++; so+=(x.balance||0); r+=(x.totalDonated||0);
+                        if(!searchQuery || x.firstName?.toLowerCase().includes(q) || x.username?.toLowerCase().includes(q) || d.id.includes(q)) {
+                            // determine color / online status
+                            let color = 'none';
+                            if (x.lastActive) {
+                                const last = x.lastActive.toDate ? x.lastActive.toDate() : new Date(x.lastActive);
+                                const diff = (now - last) / 1000; // seconds
+                                if (diff < 5*60) { color = 'green'; }
+                                else if (diff > 4*24*3600) { color = 'yellow'; }
+                            } else {
+                                // no lastActive, fallback to createdAt
+                                const last = new Date(x.createdAt || 0);
+                                const diff = (now - last) / 1000;
+                                if (diff > 4*24*3600) color = 'yellow';
+                            }
+                            list.push({id: d.id, ...x, color});
+                        }
+                    }
+                });
+                // compute online count
+                const online = list.filter(u=>u.color==='green').length;
+                setOnlineCount(online);
+                setStats({ u, sold: so, revenue: r, l: false });
+                setUserResults(list);
+            };
+            
+            useEffect(() => { if(sub==='stat') loadStats(); }, [sub, filterPeriod, searchQuery, customStart, customEnd]);
+
+            // ui filtered by color
+            const shownUsers = userResults.filter(u => colorFilter === 'all' ? true : (colorFilter === 'green' ? u.color === 'green' : colorFilter === 'yellow' ? u.color === 'yellow' : u.color === 'none'));
+
+            return (
+                <div className="page-enter p-5 pb-24">
+                    <div className="flex justify-between mb-4">
+                        <button onClick={() => setActiveTab('profile')} className="text-gray-400">Назад</button>
+                        <div className="bg-gray-800 rounded p-1 flex">
+                            <button onClick={() => setSub('set')} className={`px-3 py-1 rounded text-xs ${sub==='set'?'bg-blue-600':'text-gray-500'}`}>Настройки</button>
+                            <button onClick={() => setSub('stat')} className={`px-3 py-1 rounded text-xs ${sub==='stat'?'bg-purple-600':'text-gray-500'}`}>Статистика</button>
+                        </div>
+                    </div>
+
+                    {/* Кнопка открытия сообщений для админа */}
+                    <button onClick={()=>setAdminSupportOpen(true)} className="w-full bg-gray-800 border border-gray-700 text-white py-3 rounded-xl mb-4 flex justify-between px-4 items-center">
+                        <span>📩 Сообщения</span>
+                        {unreadSupportCount > 0 && <span className="msg-badge">{unreadSupportCount}</span>}
+                    </button>
+
+                    {sub === 'set' ? (
+                        <div className="space-y-4">
+                            <button onClick={save} className="w-full bg-blue-600 py-2 rounded font-bold text-white mb-2">Сохранить настройки</button>
+                            
+                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                <h3 className="text-blue-400 font-bold mb-2 text-xs">🔗 Основные</h3>
+                                <div className="mb-2"><label className="text-[10px] text-gray-400">Ссылка для приглашений</label><input value={lc.referralBaseUrl} onChange={e => upd('referralBaseUrl', e.target.value)} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                                <div><label className="text-[10px] text-gray-400">Token BotFather</label><input value={lc.botToken} onChange={e => upd('botToken', e.target.value)} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                            </div>
+                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                <h3 className="text-purple-400 font-bold mb-3 text-xs uppercase">💰 Экономика</h3>
+                                <label className="text-[10px] text-gray-400">Курс (RUB/токен)</label><input type="number" step="0.01" value={lc.tokenPriceRub} onChange={e => upd('tokenPriceRub', parseFloat(e.target.value))} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/>
+                            </div>
+                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                <h3 className="text-green-400 font-bold mb-3 text-sm uppercase">🎁 Бонусы</h3>
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div><label className="text-[10px] text-gray-400">Welcome</label><input type="number" value={lc.welcomeBonus} onChange={e => upd('welcomeBonus', Number(e.target.value))} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                                    <div><label className="text-[10px] text-gray-400">Referral</label><input type="number" value={lc.referralReward} onChange={e => upd('referralReward', Number(e.target.value))} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                <h3 className="text-blue-400 font-bold mb-3 text-xs uppercase">Цены</h3>
+                                <div className="grid grid-cols-3 gap-2">
+                                    <div><label className="text-[10px] text-gray-400">Фото</label><input type="number" value={lc.priceImage} onChange={e => upd('priceImage', Number(e.target.value))} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                                    <div><label className="text-[10px] text-gray-400">Видео</label><input type="number" value={lc.priceVideo} onChange={e => upd('priceVideo', Number(e.target.value))} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                                    <div><label className="text-[10px] text-gray-400">Текст</label><input type="number" value={lc.priceText} onChange={e => upd('priceText', Number(e.target.value))} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                <h3 className="text-orange-400 font-bold mb-3 text-sm uppercase">📦 Тарифы</h3>
+                                {lc.tariffs.map(t => (
+                                    <div key={t.id} className="flex gap-1 mb-2">
+                                        <input value={t.name} onChange={e => updateTariff(t.id, 'name', e.target.value)} className="w-1/3 bg-gray-900 p-1 rounded text-xs text-white border border-gray-600"/>
+                                        <input type="number" value={t.tokens} onChange={e => updateTariff(t.id, 'tokens', Number(e.target.value))} className="w-1/4 bg-gray-900 p-1 rounded text-xs text-white border border-gray-600"/>
+                                        <input type="number" value={t.price} onChange={e => updateTariff(t.id, 'price', Number(e.target.value))} className="w-1/4 bg-gray-900 p-1 rounded text-xs text-white border border-gray-600"/>
+                                        <button onClick={() => deleteTariff(t.id)} className="text-red-500 px-1">x</button>
+                                    </div>
+                                ))}
+                                <button onClick={addTariff} className="text-blue-400 text-xs">+ Добавить</button>
+                            </div>
+                            <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                <h3 className="text-yellow-400 font-bold mb-2 text-xs">💳 Оплата</h3>
+                                <div className="mb-2"><label className="text-[10px] text-gray-400">URL</label><input value={lc.paymentLink} onChange={e => upd('paymentLink', e.target.value)} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                                <div><label className="text-[10px] text-gray-400">QR</label><input value={lc.qrUrl} onChange={e => upd('qrUrl', e.target.value)} className="w-full bg-gray-900 p-2 rounded text-xs text-white border border-gray-600"/></div>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                                <button onClick={() => setFilterPeriod('all')} className={`px-3 py-1 rounded-full text-xs border ${filterPeriod==='all'?'bg-white text-black':'border-gray-600 text-gray-400'}`}>Все</button>
+                                <button onClick={() => setFilterPeriod('today')} className={`px-3 py-1 rounded-full text-xs border ${filterPeriod==='today'?'bg-white text-black':'border-gray-600 text-gray-400'}`}>Сегодня</button>
+                                <button onClick={() => setFilterPeriod('week')} className={`px-3 py-1 rounded-full text-xs border ${filterPeriod==='week'?'bg-white text-black':'border-gray-600 text-gray-400'}`}>Неделя</button>
+                                <button onClick={() => setFilterPeriod('manual')} className={`px-3 py-1 rounded-full text-xs border ${filterPeriod==='manual'?'bg-white text-black':'border-gray-600 text-gray-400'}`}>Период</button>
+                            </div>
+                            {filterPeriod === 'manual' && (
+                                <div className="bg-gray-800 p-3 rounded-xl border border-gray-700 mb-4 grid grid-cols-2 gap-2">
+                                    <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-full bg-gray-900 text-white text-xs p-2 rounded border border-gray-600"/>
+                                    <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-full bg-gray-900 text-white text-xs p-2 rounded border border-gray-600"/>
+                                </div>
+                            )}
+
+                            <div className="grid grid-cols-2 gap-3">
+                                <div className="bg-gray-800 p-3 rounded-xl"><div className="text-gray-400 text-xs">Юзеров</div><div className="text-xl font-bold text-white">{stats.u}</div></div>
+                                <div className="bg-gray-800 p-3 rounded-xl"><div className="text-gray-400 text-xs">Токенов на руках</div><div className="text-xl font-bold text-blue-400">{stats.sold}</div></div>
+                                <div className="bg-gray-800 p-3 rounded-xl col-span-2"><div className="text-gray-400 text-xs">Выручка (RUB)</div><div className="text-xl font-bold text-green-400">{stats.revenue} ₽</div></div>
+                            </div>
+                            
+                            <div className="mt-4">
+                                <div className="flex justify-between items-center mb-2">
+                                    <h3 className="text-sm font-bold text-white">Пользователи ({userResults.length})</h3>
+                                    <div className="text-xs text-gray-400">Сейчас онлайн: <b className="text-green-400">{onlineCount}</b></div>
+                                </div>
+                                <div className="flex gap-2 mb-2">
+                                    <input placeholder="Поиск..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="flex-1 bg-gray-900 rounded p-2 text-white border border-gray-700 text-xs"/>
+                                    <button onClick={toggleAll} className="bg-gray-700 px-3 rounded text-xs text-white">Все</button>
+                                </div>
+
+                                {/* Color filter */}
+                                <div className="flex gap-2 mb-2">
+                                    <button onClick={()=>setColorFilter('all')} className={`px-3 py-1 rounded text-xs ${colorFilter==='all'?'bg-white text-black':'bg-gray-800 text-gray-400'}`}>Все</button>
+                                    <button onClick={()=>setColorFilter('green')} className={`px-3 py-1 rounded text-xs ${colorFilter==='green'?'bg-green-500 text-black':'bg-gray-800 text-gray-400'}`}>Онлайн (зелёные)</button>
+                                    <button onClick={()=>setColorFilter('yellow')} className={`px-3 py-1 rounded text-xs ${colorFilter==='yellow'?'bg-yellow-400 text-black':'bg-gray-800 text-gray-400'}`}>Не заходили 4+ дней</button>
+                                    <button onClick={()=>setColorFilter('none')} className={`px-3 py-1 rounded text-xs ${colorFilter==='none'?'bg-gray-400 text-black':'bg-gray-800 text-gray-400'}`}>Прочие</button>
+                                </div>
+
+                                <div className="bg-gray-900 rounded-lg overflow-y-auto max-h-80 border border-gray-700">
+                                    {shownUsers.map(u => (
+                                        <div key={u.id} className="p-2 border-b border-gray-800 flex items-center gap-2 hover:bg-gray-800">
+                                            <span className={`status-dot ${u.color==='green'?'status-green':u.color==='yellow'?'status-yellow':''}`}></span>
+                                            <div className="flex-1 min-w-0" onClick={() => {setSingleTarget(u); setGrantModal(true);}}>
+                                                <div className="text-white text-xs font-bold truncate">{u.firstName}</div>
+                                                <div className="text-gray-500 text-[10px] truncate">{u.id}</div>
+                                            </div>
+                                            <span className="text-yellow-500 text-xs">{u.balance}</span>
+                                            <button onClick={() => setHistoryModalUser(u)} className="text-blue-400 p-2"><i className="fas fa-book"></i></button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         </div>
                     )}
 
-                    {payModalData && <PayModal />}
-                    {shareModalItem && <ShareModal />}
-                    {fullscreenItem && <FullScreenModal />}
-                    {historyModalUser && <HistoryModal />}
-                    {supportModalOpen && <SupportModal />}
-                    
-                    {notification && (
-                         <div className="modal-overlay" onClick={() => setNotification(null)}>
-                            <div className="modal-content text-center">
-                                {notification.type === 'gift' ? (
-                                    <><div className="text-4xl mb-2">🎁</div><h3 className="text-xl font-bold text-white mb-2">Подарок!</h3></>
-                                ) : (
-                                    <h3 className="text-xl font-bold text-white mb-2">Поддержка</h3>
-                                )}
-                                <p className="text-gray-300 mb-4">{notification.text}</p>
-                                <button onClick={() => setNotification(null)} className="w-full bg-blue-600 text-white py-2 rounded-xl font-bold">ОК</button>
+                    {grantModal && (
+                        <div className="modal-overlay" onClick={() => {setGrantModal(false); setSingleTarget(null);}}>
+                            <div className="modal-content" onClick={e => e.stopPropagation()}>
+                                <h3 className="text-lg font-bold text-white mb-2">
+                                    {singleTarget ? `Бонус для ${singleTarget.firstName}` : `Рассылка для ${selectedUsers.size} чел.`}
+                                </h3>
+                                <input type="number" placeholder="Сумма токенов" value={gAmount} onChange={e => setGAmount(e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-600 mb-4"/>
+                                <button onClick={executeGrant} className="w-full bg-green-600 py-2 rounded text-white font-bold mb-2">Начислить</button>
+                                <button onClick={() => {setGrantModal(false); setSingleTarget(null);}} className="w-full text-gray-400">Отмена</button>
                             </div>
                         </div>
+                    )}
+                    
+                    {adminSupportOpen && <AdminSupport onClose={()=>setAdminSupportOpen(false)} />}
+                </div>
+            );
+        };
+
+        const FullScreenModal = () => {
+            if (!fullscreenItem) return null;
+            return (
+                <div className="modal-overlay" onClick={() => setFullscreenItem(null)}>
+                    <div className="close-fs-btn" onClick={() => setFullscreenItem(null)}>&times;</div>
+                    {fullscreenItem.type === 'image' ? (
+                        <img src={fullscreenItem.url} className="fullscreen-media" onClick={e => e.stopPropagation()} />
+                    ) : (
+                        <video src={fullscreenItem.url} controls autoPlay className="fullscreen-media" onClick={e => e.stopPropagation()} />
                     )}
                 </div>
             );
         };
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
-    </script>
+        const PayModal = () => {
+            if (!payModalData) return null;
+            const { name, price, tokens } = payModalData;
+            return (
+                <div className="modal-overlay" onClick={() => setPayModalData(null)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-white mb-1">Оплата</h3>
+                        <div className="text-blue-400 font-bold mb-4">{name}</div>
+                        <div className="text-gray-400 text-sm mb-4">Вы получаете: <b className="text-white">{tokens} токенов</b></div>
+                        <div className="bg-white p-2 rounded-xl mb-4 inline-block">
+                            <img src={config.qrUrl} alt="QR" className="w-40 h-40 object-contain"/>
+                        </div>
+                        <div className="text-center mb-4"><span className="text-2xl font-bold text-green-400">{price} ₽</span></div>
+                        <a href={config.paymentLink} target="_blank" className="block w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 shadow-lg transform active:scale-95 transition">Перейти к оплате</a>
+                        <button onClick={() => setPayModalData(null)} className="w-full text-gray-400 py-2">Отмена</button>
+                    </div>
+                </div>
+            );
+        };
+
+        const ShareModal = () => {
+            if (!shareModalItem) return null;
+            const { url, prompt } = shareModalItem;
+
+            const copyLink = () => {
+                navigator.clipboard.writeText(url);
+                window.Telegram.WebApp.showAlert("Ссылка скопирована!");
+                setShareModalItem(null);
+            };
+
+            const nativeShare = () => {
+                window.Telegram.WebApp.switchInlineQuery(prompt);
+                setShareModalItem(null);
+            };
+
+            const sysShare = () => {
+                if (navigator.share) {
+                    navigator.share({ title: 'AI Bot', text: prompt, url: url }).catch(console.error);
+                } else {
+                    window.Telegram.WebApp.showAlert("Используйте копирование ссылки");
+                }
+            };
+
+            return (
+                <div className="modal-overlay" onClick={() => setShareModalItem(null)}>
+                    <div className="modal-content" onClick={e => e.stopPropagation()}>
+                        <h3 className="text-xl font-bold text-white mb-4">Поделиться</h3>
+                        <div className="space-y-3">
+                            <button onClick={nativeShare} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                                <i className="fas fa-paper-plane"></i> В Telegram
+                            </button>
+                            <button onClick={sysShare} className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold flex items-center justify-center gap-2">
+                                <i className="fas fa-share-alt"></i> Системный
+                            </button>
+                            <button onClick={copyLink} className="w-full bg-gray-800 text-white py-3 rounded-xl font-bold flex items-center justify-center border border-gray-600 gap-2">
+                                <i className="fas fa-link"></i> Копия ссылки
+                            </button>
+                            <button onClick={() => setShareModalItem(null)} className="w-full text-gray-400 py-2">Закрыть</button>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const NavItem = ({ id, icon, label }) => (
+            <button onClick={() => setActiveTab(id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === id ? 'text-blue-500 scale-110' : 'text-gray-500'}`}>
+                <i className={`fas ${icon} text-xl mb-1`}></i>
+                <span className="text-[10px] font-medium">{label}</span>
+            </button>
+        );
+
+        if (isLoading) return <div className="flex h-screen items-center justify-center text-blue-500"><i className="fas fa-circle-notch fa-spin text-2xl"></i></div>;
+        
+        return (
+            <div className="min-h-screen bg-[#17212b]">
+                {activeTab === 'generate' && <TabGenerate />}
+                {activeTab === 'chat' && <TabChat />}
+                {activeTab === 'profile' && <TabProfile />}
+                {activeTab === 'admin' && <TabAdmin />}
+                
+                {/* Меню скрываем, если открыт конкретный чат */}
+                {activeTab !== 'chat' && (
+                    <div className="fixed bottom-0 left-0 right-0 bg-[#1c2936] border-t border-gray-800 pb-safe pt-2 px-6 flex justify-around z-50 h-[70px]">
+                        <NavItem id="generate" icon="fa-wand-magic-sparkles" label="Имидж" />
+                        <NavItem id="chat" icon="fa-comments" label="Чат" />
+                        <NavItem id="profile" icon="fa-user-circle" label="Профиль" />
+                    </div>
+                )}
+
+                {payModalData && <PayModal />}
+                {shareModalItem && <ShareModal />}
+                {fullscreenItem && <FullScreenModal />}
+                {historyModalUser && <HistoryModal />}
+                {supportModalOpen && <SupportModal />}
+                
+                {/* Notification modal: show different view for support notifications (remove gift image, title Поддержка). Keep gift image and word for gift tokens*/}
+                {notification && (
+                     <div className="modal-overlay" onClick={() => setNotification(null)}>
+                        <div className="modal-content text-center">
+                            {/* detect support vs gift */}
+                            {typeof notification === 'string' && notification.startsWith('💬') ? (
+                                <>
+                                    <h3 className="text-xl font-bold text-white mb-2">Поддержка</h3>
+                                    <p className="text-gray-300 mb-4">{notification.replace(/^💬\s*/,'')}</p>
+                                    <button onClick={() => setNotification(null)} className="w-full bg-blue-600 text-white py-2 rounded-xl font-bold">Ок</button>
+                                </>
+                            ) : (
+                                <>
+                                    <div className="text-4xl mb-2">🎁</div>
+                                    <h3 className="text-xl font-bold text-white mb-2">Подарок!</h3>
+                                    <p className="text-gray-300 mb-4">{notification}</p>
+                                    <button onClick={() => setNotification(null)} className="w-full bg-blue-600 text-white py-2 rounded-xl font-bold">Спасибо!</button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                )}
+            </div>
+        );
+    };
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+</script>
+
 </body>
 </html>
-
-
