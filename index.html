@@ -132,6 +132,10 @@
             const [fullscreenItem, setFullscreenItem] = useState(null); 
             const [dbUser, setDbUser] = useState({ balance: 0, referrals: 0, firstName: '', spent: 0 });
             
+            // Состояние для модального окна начисления токенов (из статистики)
+            const [grantModalUser, setGrantModalUser] = useState(null);
+            const [modalGrantAmount, setModalGrantAmount] = useState('');
+
             const [config, setConfig] = useState({
                 priceImage: 50, priceVideo: 300, priceText: 10,
                 welcomeBonus: 100, referralReward: 50,
@@ -464,8 +468,11 @@
                                         )}
                                     </div>
                                     <div className="media-actions">
-                                        <button onClick={() => setFullscreenItem(item)} className="media-btn border-r border-[#2b3c4e]">
-                                            <i className="fas fa-expand mr-2"></i> Открыть
+                                        <button onClick={(e) => {
+                                            handleDownload(e, item.url);
+                                            setFullscreenItem(item); // И скачиваем, и открываем фуллскрин
+                                        }} className="media-btn border-r border-[#2b3c4e]">
+                                            <i className="fas fa-download mr-2"></i> Скачать
                                         </button>
                                         <button onClick={() => setShareModalItem(item)} className="media-btn">
                                             <i className="fas fa-share-nodes mr-2"></i> Поделиться
@@ -618,7 +625,7 @@
                             </div>
                             
                             <button onClick={openInBrowser} className="w-full bg-blue-900/50 py-2 rounded-xl text-sm border border-blue-800 text-blue-300 mb-2 font-bold flex items-center justify-center gap-2">
-                                <i className="fas fa-globe"></i> 🌐 Открыть в браузере (для скачивания)
+                                <i className="fas fa-globe"></i> 🌐 Открыть в браузере
                             </button>
 
                             {user.id === ADMIN_ID && <button onClick={() => setActiveTab('admin')} className="w-full bg-gray-700 py-2 rounded-xl text-sm border border-gray-600 text-white">Админка</button>}
@@ -632,7 +639,7 @@
                                 <button onClick={copyLink} className="bg-blue-600 px-4 py-3 rounded-lg font-bold text-sm text-white w-full">
                                     Скопировать ссылку
                                 </button>
-                                <div className="bg-black/40 p-3 rounded-lg overflow-hidden">
+                                <div className="bg-black/40 p-3 rounded-lg overflow-hidden text-center">
                                     <p className="text-xs text-gray-400 truncate">{link}</p>
                                 </div>
                             </div>
@@ -704,14 +711,16 @@
 
                 const save = () => saveConfigToDb(lc);
 
-                const grant = async () => {
-                    if(!gid || !gamt) return;
+                const grant = async (uid, amount) => {
+                    if(!uid || !amount) return window.Telegram.WebApp.showAlert("Ошибка данных");
                     try {
-                        const r = window.fs.doc(window.db, "users", gid);
-                        if(!(await window.fs.getDoc(r)).exists()) throw new Error();
-                        await window.fs.updateDoc(r, { balance: window.fs.increment(Number(gamt)) });
-                        window.Telegram.WebApp.showAlert("OK"); setGid(''); setGamt('');
-                    } catch(e) { window.Telegram.WebApp.showAlert("Err"); }
+                        const r = window.fs.doc(window.db, "users", uid);
+                        const snap = await window.fs.getDoc(r);
+                        if(!snap.exists()) throw new Error();
+                        await window.fs.updateDoc(r, { balance: window.fs.increment(Number(amount)) });
+                        window.Telegram.WebApp.showAlert("Успешно!");
+                        setGrantModalUser(null);
+                    } catch(e) { window.Telegram.WebApp.showAlert("Ошибка!"); }
                 };
 
                 const loadStats = async () => {
@@ -847,15 +856,6 @@
                                     <label className="text-[10px] text-gray-500">QR Картинка</label>
                                     <input value={lc.qrUrl || ''} onChange={e => upd('qrUrl', e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700 text-xs"/>
                                 </div>
-
-                                <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
-                                    <h3 className="text-pink-400 font-bold mb-2 text-xs">🎁 Выдать токены</h3>
-                                    <div className="flex gap-2">
-                                        <input placeholder="ID" value={gid} onChange={e => setGid(e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white text-xs"/>
-                                        <input placeholder="Сумма" value={gamt} onChange={e => setGamt(e.target.value)} className="w-20 bg-gray-900 rounded p-2 text-white text-xs"/>
-                                    </div>
-                                    <button onClick={grant} className="w-full mt-2 bg-pink-600 py-1 rounded text-xs font-bold text-white">Выдать</button>
-                                </div>
                             </div>
                         ) : (
                             <div className="space-y-4 page-enter">
@@ -886,25 +886,46 @@
                                         </div>
                                         <div className="bg-gray-800 p-3 rounded-xl border border-gray-700">
                                             <div className="text-gray-400 text-xs">Токенов на руках</div>
-                                            <div className="text-xl font-bold text-blue-400">{stats.sold}</div>
+                                            <div className="text-xl font-bold text-blue-400">{stats.balanceSum}</div>
                                         </div>
                                         <div className="bg-gray-800 p-3 rounded-xl border border-gray-700 col-span-2">
                                             <div className="text-gray-400 text-xs">Оборот (RUB)</div>
-                                            <div className="text-2xl font-bold text-green-400">{stats.revenue} ₽</div>
+                                            <div className="text-2xl font-bold text-green-400">{stats.spentSum} ₽</div>
                                         </div>
                                     </div>
                                 )}
                                 <div className="mt-6">
-                                    <h3 className="text-sm font-bold text-gray-300 mb-2">Пользователи</h3>
+                                    <h3 className="text-sm font-bold text-gray-300 mb-2">Пользователи (нажми для бонуса)</h3>
                                     <input type="text" placeholder="Поиск по ID или Имени..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-gray-900 rounded-lg p-2 text-sm text-white border border-gray-700 mb-2"/>
                                     
-                                    <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 max-h-40 overflow-y-auto">
+                                    <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 max-h-60 overflow-y-auto">
                                         {userResults.length === 0 ? <div className="p-2 text-xs text-gray-500">Список пуст</div> : userResults.map(u => (
-                                            <div key={u.id} className="p-2 border-b border-gray-800 text-xs flex justify-between">
-                                                <span className="text-white">{u.firstName} <span className="text-[10px] text-gray-500">({u.id})</span></span>
-                                                <span className="text-yellow-500">{u.balance} т.</span>
+                                            <div key={u.id} onClick={() => setGrantModalUser(u)} className="p-2 border-b border-gray-800 text-xs flex justify-between cursor-pointer hover:bg-gray-800 transition">
+                                                <span className="text-white font-medium">{u.firstName} <span className="text-[10px] text-gray-400 ml-1">({u.id})</span></span>
+                                                <span className="text-yellow-400 font-bold">{u.balance} т.</span>
                                             </div>
                                         ))}
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* Модалка начисления токенов */}
+                        {grantModalUser && (
+                            <div className="modal-overlay" onClick={() => setGrantModalUser(null)}>
+                                <div className="modal-content" onClick={e => e.stopPropagation()}>
+                                    <h3 className="text-lg font-bold text-white mb-2">Начислить токены</h3>
+                                    <p className="text-sm text-gray-400 mb-4">Пользователь: <b className="text-white">{grantModalUser.firstName}</b></p>
+                                    <input 
+                                        type="number" 
+                                        placeholder="Сумма" 
+                                        value={modalGrantAmount} 
+                                        onChange={e => setModalGrantAmount(e.target.value)} 
+                                        className="w-full bg-gray-900 rounded p-2 text-white border border-gray-600 mb-4"
+                                    />
+                                    <div className="flex gap-2">
+                                        <button onClick={() => grant(grantModalUser.id, modalGrantAmount)} className="flex-1 bg-green-600 py-2 rounded text-white font-bold">Начислить</button>
+                                        <button onClick={() => setGrantModalUser(null)} className="flex-1 bg-gray-700 py-2 rounded text-white">Отмена</button>
                                     </div>
                                 </div>
                             </div>
