@@ -1,77 +1,13 @@
+<!-- UPDATED: chat navigation, admin chat access, statistics selection -->
 <!DOCTYPE html><html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI Bot Pro</title><script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js">
-// ===== STEP 1: ADMIN CONTINUE CHAT FROM ARCHIVE =====
-window.openChatUser = null;
-
-// helper for admin to open client chat
-window.openClientChatFromArchive = function(userId, chatId) {
-    window.openChatUser = { userId, chatId };
-    if (typeof setActiveTab === 'function') {
-        setActiveTab('chat');
-    }
-};
-// ===== END STEP 1 =====
-
-</script>
-<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js">
-// ===== STEP 1: ADMIN CONTINUE CHAT FROM ARCHIVE =====
-window.openChatUser = null;
-
-// helper for admin to open client chat
-window.openClientChatFromArchive = function(userId, chatId) {
-    window.openChatUser = { userId, chatId };
-    if (typeof setActiveTab === 'function') {
-        setActiveTab('chat');
-    }
-};
-// ===== END STEP 1 =====
-
-</script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js">
-// ===== STEP 1: ADMIN CONTINUE CHAT FROM ARCHIVE =====
-window.openChatUser = null;
-
-// helper for admin to open client chat
-window.openClientChatFromArchive = function(userId, chatId) {
-    window.openChatUser = { userId, chatId };
-    if (typeof setActiveTab === 'function') {
-        setActiveTab('chat');
-    }
-};
-// ===== END STEP 1 =====
-
-</script>
-<script src="https://cdn.tailwindcss.com">
-// ===== STEP 1: ADMIN CONTINUE CHAT FROM ARCHIVE =====
-window.openChatUser = null;
-
-// helper for admin to open client chat
-window.openClientChatFromArchive = function(userId, chatId) {
-    window.openChatUser = { userId, chatId };
-    if (typeof setActiveTab === 'function') {
-        setActiveTab('chat');
-    }
-};
-// ===== END STEP 1 =====
-
-</script>
-<script src="https://telegram.org/js/telegram-web-app.js">
-// ===== STEP 1: ADMIN CONTINUE CHAT FROM ARCHIVE =====
-window.openChatUser = null;
-
-// helper for admin to open client chat
-window.openClientChatFromArchive = function(userId, chatId) {
-    window.openChatUser = { userId, chatId };
-    if (typeof setActiveTab === 'function') {
-        setActiveTab('chat');
-    }
-};
-// ===== END STEP 1 =====
-
-</script>
+    <title>AI Bot Pro</title><script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
 
 <style>
@@ -114,9 +50,7 @@ window.openClientChatFromArchive = function(userId, chatId) {
     .media-btn { flex: 1; padding: 12px; text-align: center; color: #3390ec; font-weight: bold; font-size: 14px; background: rgba(255,255,255,0.02); }
     .media-btn:active { background: rgba(255,255,255,0.05); }
 
-    .chat-input-area {
-    z-index: 9999;
-    padding-bottom: max(10px, env(safe-area-inset-bottom)); position: fixed; bottom: 0; left: 0; right: 0; background: #17212b; padding: 10px; border-top: 1px solid #2b2b2b; z-index: 50; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+    .chat-input-area { position: fixed; bottom: 0; left: 0; right: 0; background: #17212b; padding: 10px; border-top: 1px solid #2b2b2b; z-index: 50; padding-bottom: max(10px, env(safe-area-inset-bottom)); }
     
     .chat-item { background: #233040; border-radius: 12px; padding: 12px; margin-bottom: 8px; cursor: pointer; border: 1px solid transparent; transition: all 0.2s; }
     .chat-item:active { transform: scale(0.98); background: #2b3c4e; }
@@ -169,19 +103,6 @@ window.openClientChatFromArchive = function(userId, chatId) {
     };
     window.firebaseReady = true;
     document.dispatchEvent(new Event('firebase-ready'));
-
-// ===== STEP 1: ADMIN CONTINUE CHAT FROM ARCHIVE =====
-window.openChatUser = null;
-
-// helper for admin to open client chat
-window.openClientChatFromArchive = function(userId, chatId) {
-    window.openChatUser = { userId, chatId };
-    if (typeof setActiveTab === 'function') {
-        setActiveTab('chat');
-    }
-};
-// ===== END STEP 1 =====
-
 </script>
 
 <script type="text/babel">
@@ -1362,19 +1283,6 @@ window.openClientChatFromArchive = function(userId, chatId) {
 
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(<App />);
-
-// ===== STEP 1: ADMIN CONTINUE CHAT FROM ARCHIVE =====
-window.openChatUser = null;
-
-// helper for admin to open client chat
-window.openClientChatFromArchive = function(userId, chatId) {
-    window.openChatUser = { userId, chatId };
-    if (typeof setActiveTab === 'function') {
-        setActiveTab('chat');
-    }
-};
-// ===== END STEP 1 =====
-
 </script>
 
 </body>
