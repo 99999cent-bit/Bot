@@ -97,6 +97,7 @@
         const { useState, useEffect, useRef, useMemo } = React;
         
         const ADMIN_ID = 442529744; 
+        const DEFAULT_BASE_URL = "https://99999cent-bit.github.io/Bot/"; 
 
         const copyToClipboard = async (text) => {
             try {
@@ -138,6 +139,7 @@
                 paymentLink: "", 
                 qrUrl: "https://upload.wikimedia.org/wikipedia/commons/d/d0/QR_code_for_mobile_English_Wikipedia.svg",
                 botToken: "",
+                referralBaseUrl: DEFAULT_BASE_URL,
                 tariffs: [
                     { id: 1, name: '🚀 Старт', tokens: 100, price: 99 },
                     { id: 2, name: '💎 Профи', tokens: 500, price: 450 },
@@ -145,7 +147,6 @@
                 ]
             });
 
-            // Таймер для долгого нажатия
             const longPressTimer = useRef(null);
 
             useEffect(() => {
@@ -157,7 +158,27 @@
                         tg.enableClosingConfirmation();
 
                         let telegramUser = tg.initDataUnsafe?.user;
-                        if (!telegramUser) telegramUser = { id: ADMIN_ID, first_name: 'Admin', username: 'admin' };
+
+                        if (!telegramUser) {
+                            const urlParams = new URLSearchParams(window.location.search);
+                            const uid = urlParams.get('uid'); 
+                            const firstName = urlParams.get('first_name');
+                            
+                            if (uid) {
+                                telegramUser = { 
+                                    id: uid, 
+                                    first_name: firstName || 'Пользователь', 
+                                    username: 'web_user' 
+                                };
+                            } else {
+                                let guestId = localStorage.getItem('ai_bot_guest_id');
+                                if (!guestId) {
+                                    guestId = 'guest_' + Date.now() + '_' + Math.floor(Math.random() * 1000);
+                                    localStorage.setItem('ai_bot_guest_id', guestId);
+                                }
+                                telegramUser = { id: guestId, first_name: 'Гость', username: 'guest' };
+                            }
+                        }
                         
                         if (!window.firebaseReady) await new Promise(r => document.addEventListener('firebase-ready', r));
 
@@ -165,9 +186,21 @@
                         const db = window.db;
 
                         const configRef = doc(db, "settings", "global");
+                        const configSnap = await getDoc(configRef);
+                        let currentReferralReward = 50;
+                        let currentWelcomeBonus = 100;
+
+                        if (configSnap.exists()) {
+                            const data = configSnap.data();
+                            setConfig(prev => ({ ...prev, ...data }));
+                            currentReferralReward = data.referralReward || 50;
+                            currentWelcomeBonus = data.welcomeBonus || 100;
+                        } else {
+                            setDoc(configRef, config);
+                        }
+                        
                         onSnapshot(configRef, (snap) => {
                             if (snap.exists()) setConfig(prev => ({ ...prev, ...snap.data() }));
-                            else setDoc(configRef, config);
                         });
 
                         const userRef = doc(db, "users", telegramUser.id.toString());
@@ -180,7 +213,7 @@
                             await setDoc(userRef, {
                                 username: telegramUser.username || '',
                                 firstName: telegramUser.first_name || 'Пользователь',
-                                balance: config.welcomeBonus || 100,
+                                balance: currentWelcomeBonus,
                                 referrals: 0,
                                 spent: 0,
                                 invitedBy: startParam || null,
@@ -193,7 +226,7 @@
                                 if(refSnap.exists()){
                                     updateDoc(refUserRef, {
                                         referrals: increment(1),
-                                        balance: increment(config.referralReward || 50) 
+                                        balance: increment(currentReferralReward) 
                                     }).catch(console.error);
                                 }
                             }
@@ -247,18 +280,38 @@
                 return true; 
             };
 
-            // ФУНКЦИЯ "СКАЧАТЬ" - ТЕПЕРЬ ПРОСТО ОТКРЫВАЕТ В БРАУЗЕРЕ
-            const handleDownload = (url) => {
-                window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
-                // Открываем ссылку во внешнем браузере
-                window.Telegram.WebApp.openLink(url, { try_instant_view: false });
+            const handleDownload = async (e, url) => {
+                if(e && e.stopPropagation) e.stopPropagation();
+
+                if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('selection');
+                try {
+                    const response = await fetch(url);
+                    const blob = await response.blob();
+                    const blobUrl = window.URL.createObjectURL(blob);
+                    
+                    const link = document.createElement('a');
+                    link.href = blobUrl;
+                    const ext = genType === 'image' ? 'png' : 'mp4';
+                    link.download = `ai_media_${Date.now()}.${ext}`;
+                    document.body.appendChild(link);
+                    link.click();
+                    
+                    setTimeout(() => {
+                        document.body.removeChild(link);
+                        window.URL.revokeObjectURL(blobUrl);
+                    }, 500);
+                    
+                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                } catch (e) {
+                    console.error("Download fail:", e);
+                    window.Telegram.WebApp.openLink(url, { try_instant_view: false });
+                }
             };
 
-            // Обработчики долгого нажатия для ИЗОБРАЖЕНИЙ (видео обрабатываются плеером)
             const handleTouchStart = (item) => {
-                if (item.type === 'video') return; // Видео не трогаем, там нативные контролы
+                if (item.type === 'video') return; 
                 longPressTimer.current = setTimeout(() => {
-                    handleDownload(item.url);
+                    handleDownload(null, item.url);
                 }, 600); 
             };
 
@@ -269,13 +322,18 @@
                 }
             };
 
+            const openInBrowser = () => {
+                const url = `${config.referralBaseUrl || DEFAULT_BASE_URL}?uid=${user.id}&first_name=${encodeURIComponent(user.first_name)}`;
+                window.Telegram.WebApp.openLink(url);
+            };
+
             const deleteMedia = async (e, id) => {
                 e.stopPropagation();
                 if(!confirm("Удалить этот файл навсегда?")) return;
                 try {
                     const { deleteDoc, doc } = window.fs;
                     await deleteDoc(doc(window.db, "users", user.id.toString(), "history", id));
-                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                 } catch (err) {
                     window.Telegram.WebApp.showAlert("Ошибка удаления");
                 }
@@ -298,7 +356,7 @@
                         deleteDoc(doc(window.db, "users", user.id.toString(), "history", item.id))
                     ));
                     
-                    window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                    if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                     window.Telegram.WebApp.showAlert(`Все ${typeName} удалены.`);
                 } catch (err) {
                     console.error(err);
@@ -345,7 +403,7 @@
                         
                         setIsProc(false);
                         setPrompt('');
-                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                        if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                     }, 2000);
                 };
 
@@ -406,8 +464,8 @@
                                         )}
                                     </div>
                                     <div className="media-actions">
-                                        <button onClick={() => handleDownload(item.url)} className="media-btn border-r border-[#2b3c4e]">
-                                            <i className="fas fa-download mr-2"></i> Скачать
+                                        <button onClick={() => setFullscreenItem(item)} className="media-btn border-r border-[#2b3c4e]">
+                                            <i className="fas fa-expand mr-2"></i> Открыть
                                         </button>
                                         <button onClick={() => setShareModalItem(item)} className="media-btn">
                                             <i className="fas fa-share-nodes mr-2"></i> Поделиться
@@ -490,7 +548,7 @@
                         addDoc(collection(window.db, "users", user.id.toString(), "chats", cid, "messages"), {
                             role: 'ai', text: "Ответ на: " + text, createdAt: serverTimestamp()
                         });
-                        window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
+                        if(window.Telegram?.WebApp?.HapticFeedback) window.Telegram.WebApp.HapticFeedback.notificationOccurred('success');
                     }, 1000);
                 };
 
@@ -537,7 +595,8 @@
 
             const TabProfile = () => {
                 const [buyV, setBuyV] = useState(100);
-                const link = `https://t.me/Ai_Generator75_Bot?start=${user?.id}`;
+                const baseUrl = config.referralBaseUrl || DEFAULT_BASE_URL;
+                const link = `${baseUrl}?start=${user?.id}`;
 
                 const handleBuy = (amt, price, name) => {
                     setPayModalData({ name: name || 'Пополнение', tokens: amt, price: price || Math.ceil(amt * config.tokenPriceRub) });
@@ -557,15 +616,25 @@
                                 <div><h2 className="text-2xl font-bold text-white">{user.first_name}</h2><p className="text-gray-400 text-sm">ID: {user.id}</p></div>
                                 <div className="text-right"><span className="block text-4xl font-bold text-yellow-400">{user.id===ADMIN_ID ? '∞' : dbUser.balance}</span><span className="text-xs text-gray-400 uppercase">Токенов</span></div>
                             </div>
+                            
+                            <button onClick={openInBrowser} className="w-full bg-blue-900/50 py-2 rounded-xl text-sm border border-blue-800 text-blue-300 mb-2 font-bold flex items-center justify-center gap-2">
+                                <i className="fas fa-globe"></i> 🌐 Открыть в браузере (для скачивания)
+                            </button>
+
                             {user.id === ADMIN_ID && <button onClick={() => setActiveTab('admin')} className="w-full bg-gray-700 py-2 rounded-xl text-sm border border-gray-600 text-white">Админка</button>}
                         </div>
 
                         <div className="bg-gray-800 rounded-2xl p-5 border border-gray-700 mb-4">
                             <h3 className="font-bold text-lg mb-2 text-white">🎁 Пригласи друга</h3>
-                            <p className="text-sm text-gray-300 mb-2">Награда: {config.referralReward} т.</p>
-                            <div className="flex gap-2">
-                                <div className="bg-black/40 p-3 rounded-lg flex-1 overflow-hidden"><p className="text-xs text-gray-400 truncate">{link}</p></div>
-                                <button onClick={copyLink} className="bg-blue-600 px-4 rounded-lg font-bold text-sm text-white">Копия</button>
+                            <p className="text-sm text-gray-300 mb-4">Награда: {config.referralReward} т.</p>
+                            
+                            <div className="flex flex-col gap-2">
+                                <button onClick={copyLink} className="bg-blue-600 px-4 py-3 rounded-lg font-bold text-sm text-white w-full">
+                                    Скопировать ссылку
+                                </button>
+                                <div className="bg-black/40 p-3 rounded-lg overflow-hidden">
+                                    <p className="text-xs text-gray-400 truncate">{link}</p>
+                                </div>
                             </div>
                         </div>
 
@@ -702,6 +771,14 @@
                                 <div className="flex justify-between"><h2 className="text-xl font-bold text-white">Настройки</h2><button onClick={save} className="bg-blue-600 px-4 py-2 rounded text-xs font-bold text-white">Сохранить</button></div>
                                 
                                 <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
+                                    <h3 className="text-blue-400 font-bold mb-2 text-xs">🔗 Основные</h3>
+                                    <div>
+                                        <label className="text-xs text-gray-300 block mb-1">Базовая ссылка для приглашений</label>
+                                        <input value={lc.referralBaseUrl || ''} onChange={e => upd('referralBaseUrl', e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700 text-xs" placeholder="https://..."/>
+                                    </div>
+                                </div>
+
+                                <div className="bg-gray-800 p-4 rounded-xl border border-gray-700">
                                     <h3 className="text-blue-400 font-bold mb-2 text-xs">🤖 Бот Токен</h3>
                                     <input value={lc.botToken || ''} onChange={e => upd('botToken', e.target.value)} className="w-full bg-gray-900 rounded p-2 text-white border border-gray-700 text-xs" placeholder="Токен от BotFather"/>
                                 </div>
@@ -781,33 +858,54 @@
                                 </div>
                             </div>
                         ) : (
-                            <div className="space-y-4">
+                            <div className="space-y-4 page-enter">
+                                <h2 className="text-xl font-bold text-white mb-2">📊 Аналитика</h2>
                                 <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
                                     <button onClick={() => setFilterPeriod('all')} className={`px-3 py-1 rounded-full text-xs whitespace-nowrap border ${filterPeriod==='all'?'bg-white text-black border-white':'border-gray-600 text-gray-400'}`}>Все</button>
                                     <button onClick={() => setFilterPeriod('today')} className={`px-3 py-1 rounded-full text-xs whitespace-nowrap border ${filterPeriod==='today'?'bg-white text-black border-white':'border-gray-600 text-gray-400'}`}>Сегодня</button>
                                     <button onClick={() => setFilterPeriod('week')} className={`px-3 py-1 rounded-full text-xs whitespace-nowrap border ${filterPeriod==='week'?'bg-white text-black border-white':'border-gray-600 text-gray-400'}`}>Неделя</button>
-                                    <button onClick={() => setFilterPeriod('manual')} className={`px-3 py-1 rounded-full text-xs whitespace-nowrap border ${filterPeriod==='manual'?'bg-white text-black border-white':'border-gray-600 text-gray-400'}`}>Период</button>
+                                    <button onClick={() => setFilterPeriod('manual')} className={`px-3 py-1 rounded-full text-xs whitespace-nowrap border ${filterPeriod==='manual'?'bg-white text-black border-white':'border-gray-600 text-gray-400'}`}>📅 Период</button>
                                 </div>
                                 {filterPeriod === 'manual' && (
                                     <div className="bg-gray-800 p-3 rounded-xl border border-gray-700 mb-4 grid grid-cols-2 gap-2">
-                                        <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-full bg-gray-900 text-white text-xs p-2 rounded border border-gray-600"/>
-                                        <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-full bg-gray-900 text-white text-xs p-2 rounded border border-gray-600"/>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400">С даты:</label>
+                                            <input type="date" value={customStart} onChange={e => setCustomStart(e.target.value)} className="w-full bg-gray-900 text-white text-xs p-2 rounded border border-gray-600"/>
+                                        </div>
+                                        <div>
+                                            <label className="text-[10px] text-gray-400">По дату:</label>
+                                            <input type="date" value={customEnd} onChange={e => setCustomEnd(e.target.value)} className="w-full bg-gray-900 text-white text-xs p-2 rounded border border-gray-600"/>
+                                        </div>
                                     </div>
                                 )}
-
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-gray-800 p-3 rounded-xl"><div className="text-gray-400 text-xs">Юзеров</div><div className="text-xl font-bold">{stats.u}</div></div>
-                                    <div className="bg-gray-800 p-3 rounded-xl"><div className="text-gray-400 text-xs">Токенов на руках</div><div className="text-xl font-bold text-blue-400">{stats.balanceSum}</div></div>
-                                    <div className="bg-gray-800 p-3 rounded-xl col-span-2"><div className="text-gray-400 text-xs">Потрачено (Оборот)</div><div className="text-xl font-bold text-green-400">{stats.spentSum}</div></div>
-                                </div>
-                                <input type="text" placeholder="Поиск юзера..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-gray-900 rounded-lg p-2 text-sm text-white border border-gray-700"/>
-                                <div className="bg-gray-900 rounded-lg overflow-y-auto max-h-60">
-                                    {userResults.map(u => (
-                                        <div key={u.id} className="p-2 border-b border-gray-800 text-xs flex justify-between">
-                                            <span>{u.firstName} ({u.id})</span>
-                                            <span className="text-yellow-500">{u.balance}</span>
+                                {stats.loading ? <div className="text-center text-gray-500">Загрузка данных...</div> : (
+                                    <div className="grid grid-cols-2 gap-3">
+                                        <div className="bg-gray-800 p-3 rounded-xl border border-gray-700">
+                                            <div className="text-gray-400 text-xs">Регистраций</div>
+                                            <div className="text-xl font-bold text-white">{stats.users}</div>
                                         </div>
-                                    ))}
+                                        <div className="bg-gray-800 p-3 rounded-xl border border-gray-700">
+                                            <div className="text-gray-400 text-xs">Токенов на руках</div>
+                                            <div className="text-xl font-bold text-blue-400">{stats.sold}</div>
+                                        </div>
+                                        <div className="bg-gray-800 p-3 rounded-xl border border-gray-700 col-span-2">
+                                            <div className="text-gray-400 text-xs">Оборот (RUB)</div>
+                                            <div className="text-2xl font-bold text-green-400">{stats.revenue} ₽</div>
+                                        </div>
+                                    </div>
+                                )}
+                                <div className="mt-6">
+                                    <h3 className="text-sm font-bold text-gray-300 mb-2">Пользователи</h3>
+                                    <input type="text" placeholder="Поиск по ID или Имени..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full bg-gray-900 rounded-lg p-2 text-sm text-white border border-gray-700 mb-2"/>
+                                    
+                                    <div className="bg-gray-900 rounded-lg overflow-hidden border border-gray-800 max-h-40 overflow-y-auto">
+                                        {userResults.length === 0 ? <div className="p-2 text-xs text-gray-500">Список пуст</div> : userResults.map(u => (
+                                            <div key={u.id} className="p-2 border-b border-gray-800 text-xs flex justify-between">
+                                                <span className="text-white">{u.firstName} <span className="text-[10px] text-gray-500">({u.id})</span></span>
+                                                <span className="text-yellow-500">{u.balance} т.</span>
+                                            </div>
+                                        ))}
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -815,21 +913,77 @@
                 );
             };
 
+            const FullScreenModal = () => {
+                if (!fullscreenItem) return null;
+                return (
+                    <div className="modal-overlay" onClick={() => setFullscreenItem(null)}>
+                        <div className="close-fs-btn" onClick={() => setFullscreenItem(null)}>&times;</div>
+                        {fullscreenItem.type === 'image' ? (
+                            <img src={fullscreenItem.url} className="fullscreen-media" onClick={e => e.stopPropagation()} />
+                        ) : (
+                            <video src={fullscreenItem.url} controls autoPlay className="fullscreen-media" onClick={e => e.stopPropagation()} />
+                        )}
+                    </div>
+                );
+            };
+
             const PayModal = () => {
                 if (!payModalData) return null;
+                const { name, price, tokens } = payModalData;
                 return (
                     <div className="modal-overlay" onClick={() => setPayModalData(null)}>
                         <div className="modal-content" onClick={e => e.stopPropagation()}>
-                            <h3 className="text-xl font-bold text-white mb-2">Оплата</h3>
-                            <div className="text-gray-300 text-sm mb-4">Тариф: {payModalData.name} ({payModalData.tokens} т.)</div>
-                            {config.qrUrl && <div className="bg-white p-2 rounded-xl mb-4 inline-block"><img src={config.qrUrl} className="w-40 h-40 object-contain"/></div>}
-                            <div className="text-2xl font-bold text-green-400 mb-4">{payModalData.price} ₽</div>
-                            {config.paymentLink ? (
-                                <a href={config.paymentLink} target="_blank" className="block w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3">Оплатить</a>
-                            ) : (
-                                <div className="text-red-400 text-xs mb-3">Ссылка на оплату не настроена</div>
-                            )}
-                            <button onClick={() => setPayModalData(null)} className="w-full text-gray-500 py-2">Закрыть</button>
+                            <h3 className="text-xl font-bold text-white mb-1">Оплата</h3>
+                            <div className="text-blue-400 font-bold mb-4">{name}</div>
+                            <div className="text-gray-400 text-sm mb-4">Вы получаете: <b className="text-white">{tokens} токенов</b></div>
+                            <div className="bg-white p-2 rounded-xl mb-4 inline-block">
+                                <img src={config.qrUrl} alt="QR" className="w-40 h-40 object-contain"/>
+                            </div>
+                            <div className="text-center mb-4"><span className="text-2xl font-bold text-green-400">{price} ₽</span></div>
+                            <a href={config.paymentLink} target="_blank" className="block w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 shadow-lg transform active:scale-95 transition">Перейти к оплате</a>
+                            <button onClick={() => setPayModalData(null)} className="w-full text-gray-400 py-2">Отмена</button>
+                        </div>
+                    </div>
+                );
+            };
+
+            const ShareModal = () => {
+                if (!shareModalItem) return null;
+                const { url, prompt } = shareModalItem;
+
+                const copyLink = () => {
+                    navigator.clipboard.writeText(url);
+                    window.Telegram.WebApp.showAlert("Ссылка скопирована!");
+                    setShareModalItem(null);
+                };
+
+                const nativeShare = () => {
+                    window.Telegram.WebApp.switchInlineQuery(prompt);
+                    setShareModalItem(null);
+                };
+
+                const sysShare = () => {
+                    if (navigator.share) {
+                        navigator.share({ title: 'AI Bot', text: prompt, url: url }).catch(console.error);
+                    } else {
+                        window.Telegram.WebApp.showAlert("Используйте копирование ссылки");
+                    }
+                };
+
+                return (
+                    <div className="modal-overlay" onClick={() => setShareModalItem(null)}>
+                        <div className="modal-content" onClick={e => e.stopPropagation()}>
+                            <h3 className="text-xl font-bold text-white mb-4">Поделиться</h3>
+                            <button onClick={nativeShare} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
+                                <i className="fas fa-paper-plane mr-2"></i> Переслать в Telegram
+                            </button>
+                             <button onClick={sysShare} className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
+                                <i className="fas fa-share-alt mr-2"></i> Системный шаринг
+                            </button>
+                            <button onClick={copyLink} className="w-full bg-gray-800 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center border border-gray-600">
+                                <i className="fas fa-link mr-2"></i> Скопировать ссылку
+                            </button>
+                            <button onClick={() => setShareModalItem(null)} className="w-full text-gray-400 py-2">Закрыть</button>
                         </div>
                     </div>
                 );
@@ -837,7 +991,8 @@
 
             const NavItem = ({ id, icon, label }) => (
                 <button onClick={() => setActiveTab(id)} className={`flex flex-col items-center justify-center w-16 transition-all ${activeTab === id ? 'text-blue-500 scale-110' : 'text-gray-500'}`}>
-                    <i className={`fas ${icon} text-xl mb-1`}></i><span className="text-[10px] font-medium">{label}</span>
+                    <i className={`fas ${icon} text-xl mb-1`}></i>
+                    <span className="text-[10px] font-medium">{label}</span>
                 </button>
             );
 
@@ -850,45 +1005,15 @@
                     {activeTab === 'profile' && <TabProfile />}
                     {activeTab === 'admin' && <TabAdmin />}
                     
-                    {!(activeTab === 'chat' && fullscreenItem === 'dummy') && (
-                        <div className="fixed bottom-0 left-0 right-0 bg-[#1c2936] border-t border-gray-800 pb-safe pt-2 px-6 flex justify-around z-50 h-[70px]">
-                            <NavItem id="generate" icon="fa-wand-magic-sparkles" label="Имидж" />
-                            <NavItem id="chat" icon="fa-comments" label="Чат" />
-                            <NavItem id="profile" icon="fa-user-circle" label="Профиль" />
-                        </div>
-                    )}
+                    <div className="fixed bottom-0 left-0 right-0 bg-[#1c2936] border-t border-gray-800 pb-safe pt-2 px-6 flex justify-around z-50 h-[70px]">
+                        <NavItem id="generate" icon="fa-wand-magic-sparkles" label="Имидж" />
+                        <NavItem id="chat" icon="fa-comments" label="Чат" />
+                        <NavItem id="profile" icon="fa-user-circle" label="Профиль" />
+                    </div>
 
                     {payModalData && <PayModal />}
-                    {shareModalItem && <div className="modal-overlay" onClick={() => setShareModalItem(null)}>
-                        <div className="modal-content" onClick={e => e.stopPropagation()}>
-                            <h3 className="text-xl font-bold text-white mb-4">Поделиться</h3>
-                            
-                            {navigator.share ? (
-                                <button onClick={() => {
-                                    navigator.share({ title: 'AI Bot Media', text: shareModalItem.prompt, url: shareModalItem.url })
-                                        .catch(() => window.Telegram.WebApp.showAlert("Шаринг отменен"));
-                                    setShareModalItem(null);
-                                }} className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-3 flex items-center justify-center">
-                                    <i className="fas fa-share-alt mr-2"></i> Системный шаринг
-                                </button>
-                            ) : (
-                                <div className="text-gray-500 text-xs mb-3">Системный шаринг не поддерживается</div>
-                            )}
-
-                            <button onClick={()=>{
-                                copyToClipboard(shareModalItem.url).then(()=>window.Telegram.WebApp.showAlert("Скопировано!")); 
-                                setShareModalItem(null)
-                            }} className="w-full bg-gray-700 text-white py-3 rounded-xl font-bold flex items-center justify-center">
-                                <i className="fas fa-copy mr-2"></i> Скопировать ссылку
-                            </button>
-
-                            <button onClick={() => setShareModalItem(null)} className="w-full text-gray-400 py-2 mt-2">Закрыть</button>
-                        </div>
-                    </div>}
-                    {fullscreenItem && <div className="modal-overlay" onClick={() => setFullscreenItem(null)}>
-                        <div className="close-fs-btn" onClick={() => setFullscreenItem(null)}>&times;</div>
-                        {fullscreenItem.type === 'image' ? <img src={fullscreenItem.url} className="fullscreen-media" onClick={e=>e.stopPropagation()} /> : <video src={fullscreenItem.url} controls autoPlay className="fullscreen-media" onClick={e=>e.stopPropagation()} />}
-                    </div>}
+                    {shareModalItem && <ShareModal />}
+                    {fullscreenItem && <FullScreenModal />}
                 </div>
             );
         };
