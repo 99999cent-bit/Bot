@@ -1284,51 +1284,5 @@
     root.render(<App />);
 </script>
 
-
-<script>
-/* --- Support Chat Replacement --- */
-window.openSupportChat = function(userId){
-  window.currentSupportUser = userId;
-  window.location.hash = '#support-chat';
-};
-
-document.addEventListener('DOMContentLoaded', () => {
-  if (!document.getElementById('support-chat')) {
-    const div = document.createElement('div');
-    div.id = 'support-chat';
-    div.style.display = 'none';
-    div.innerHTML = `
-      <div style="padding:10px">
-        <button onclick="history.back()">Назад</button>
-        <div id="supportMessages" style="margin:10px 0;height:300px;overflow:auto;border:1px solid #ccc"></div>
-        <input id="supportInput" placeholder="Сообщение..." style="width:80%">
-        <button onclick="sendSupportMessage()">Отправить</button>
-      </div>`;
-    document.body.appendChild(div);
-  }
-
-  window.addEventListener('hashchange', renderSupportChat);
-  renderSupportChat();
-});
-
-function renderSupportChat(){
-  const chat = document.getElementById('support-chat');
-  if (location.hash === '#support-chat'){
-    chat.style.display = 'block';
-  } else {
-    chat.style.display = 'none';
-  }
-}
-
-function sendSupportMessage(){
-  const input = document.getElementById('supportInput');
-  if(!input.value) return;
-  const msg = document.createElement('div');
-  msg.textContent = 'Админ: ' + input.value;
-  document.getElementById('supportMessages').appendChild(msg);
-  input.value = '';
-}
-</script>
-
 </body>
 </html>
